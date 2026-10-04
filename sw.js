@@ -1,8 +1,8 @@
 // Cache hors-ligne. Change VERSION à chaque mise à jour pour que les téléphones récupèrent les nouveaux fichiers.
-const VERSION = 'releve-v19';
+const VERSION = 'releve-v20';
 const FILES = [
   './', 'index.html', 'app.css', 'app.js', 'data.js', 'manifest.webmanifest',
-  'mentions-legales.html', 'fiches/vif.html', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png'
+  'mentions-legales.html', 'fiches/vif.html', 'fiches/chaine.html', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png'
 ];
 
 self.addEventListener('install', (e) => {

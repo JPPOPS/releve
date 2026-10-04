@@ -231,10 +231,16 @@ window.OPT_LABELS = { niveau: "Jusqu'où", sens: "Sens", cote: "Côté", veh: "V
 /* Fiches explicatives (animation + schéma + texte), reliées aux thèmes et aux erreurs */
 window.FICHES = {
   vif: { titre: "Vérifier, Informer, Faire", url: "fiches/vif.html", code: "C1.8",
-    parts: [["Changement de voie", ""], ["Tourner à gauche après un arrêt", "#gauche"]] }
+    parts: [["Changement de voie", ""], ["Tourner à gauche après un arrêt", "#gauche"]] },
+  chaine: { titre: "La chaîne cinématique", url: "fiches/chaine.html", code: "C1.4 · C1.5 · C1.6",
+    parts: [["Moteur, embrayage, boîte, roues", ""], ["Point de patinage", "#patinage"], ["Régime moteur", "#regime"], ["Frein moteur", "#freinmoteur"], ["Roue libre", "#rouelibre"], ["Calage", "#calage"], ["Les pieds sur les pédales", "#pieds"], ["La grille de la boîte", "#boite"]] }
 };
 window.FICHE_DE = {
   t_vif: "vif", t_chgvoie: "vif",
   angle: "vif", retro: "vif", cligno: "vif", cligno2: "vif",
-  t_tournerg: "vif#gauche", tourner: "vif#gauche"
+  t_tournerg: "vif#gauche", tourner: "vif#gauche",
+  t_chaine: "chaine", t_pp: "chaine#patinage", t_demplat: "chaine#patinage", t_lente: "chaine#patinage", calage: "chaine#calage",
+  t_regime: "chaine#regime", rapport: "chaine#regime", accel: "chaine#regime", t_montee: "chaine#regime",
+  t_freinmoteur: "chaine#freinmoteur", t_rouelibre: "chaine#rouelibre",
+  t_pedalier: "chaine#pieds", t_bvstat: "chaine#boite", levier: "chaine#boite"
 };
