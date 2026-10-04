@@ -13,11 +13,13 @@
   const OBJ = [];
   Object.keys(REF).forEach((c) => REF[c].objectifs.forEach(([titre, savoirs], i) => OBJ.push({ id: `${c}-${i + 1}`, comp: c, n: i + 1, titre, savoirs })));
   const OBJ_BY = Object.fromEntries(OBJ.map((o, i) => [o.id, Object.assign(o, { idx: i })]));
+  const cd = (id) => String(id).replace('-', '.');
+  const COLORS = { C1: '#0F8F8F', C2: '#D4116B', C3: '#5E8A12', C4: '#C46F00' };
   const savoirTxt = (l) => OBJ_BY[l[0]].savoirs[l[1] - 1] || OBJ_BY[l[0]].titre;
 
   // ---------- État ----------
   let S;
-  function fresh() { return { hide: false, sit: true, custom: [], lesson: null }; }
+  function fresh() { return { hide: false, sit: true, sitDur: 30, custom: [], lesson: null }; }
   try { S = Object.assign(fresh(), JSON.parse(localStorage.getItem(KEY)) || {}); } catch (e) { S = fresh(); }
   function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { /* */ } }
   const L = () => S.lesson;
@@ -50,17 +52,21 @@
     t.textContent = msg; t.style.display = 'block';
     clearTimeout(toastT); toastT = setTimeout(() => { t.style.display = 'none'; }, 1400);
   }
-  function hideSit() { const b = document.querySelector('.sitbar'); if (b) b.remove(); clearTimeout(sitT); }
-  function askSituation() {
-    hideSit(); if (!S.sit) return;
+  function hideSit() { const b = document.querySelector('.sitbar'); if (b) b.remove(); document.body.classList.remove('has-sit'); clearTimeout(sitT); }
+  function askSituation(force) {
+    hideSit(); if (!S.sit && !force) return;
+    const l = L(), last = l.log[l.log.length - 1]; if (!last) return;
+    const dur = S.sitDur || 0;
     const bar = document.createElement('div'); bar.className = 'sitbar';
-    bar.innerHTML = `<div class="small" style="font-weight:700">Situation ? <span class="muted" style="font-weight:400">(facultatif)</span></div><div class="chips">${SITUATIONS.map((s) => `<button data-s="${esc(s)}">${esc(s)}</button>`).join('')}</div>`;
-    document.body.appendChild(bar);
+    bar.innerHTML = `<div class="row between"><div class="small" style="font-weight:700">Situation : ${esc(ERR_BY[last.id].label)} <span class="muted" style="font-weight:400">(facultatif)</span></div><button class="icon-btn" id="sitx" aria-label="Fermer" style="width:40px;height:40px">✕</button></div>
+      ${dur ? `<div class="sitprog"><div style="animation-duration:${dur}s"></div></div>` : ''}
+      <div class="sitgrid">${SITUATIONS.map((s2) => `<button data-s="${esc(s2)}" ${last.sit === s2 ? 'aria-pressed="true"' : ''}>${esc(s2)}</button>`).join('')}</div>`;
+    document.body.appendChild(bar); document.body.classList.add('has-sit');
+    bar.querySelector('#sitx').addEventListener('click', hideSit);
     bar.querySelectorAll('[data-s]').forEach((b) => b.addEventListener('click', () => {
-      const l = L(), last = l.log[l.log.length - 1]; if (!last) return;
-      last.sit = b.dataset.s; save(); hideSit(); toast(`${ERR_BY[last.id].label} · ${last.sit}`);
+      last.sit = b.dataset.s; save(); hideSit(); toast(`${ERR_BY[last.id].label} · ${last.sit}`); if (location.hash !== '#bilan') vLecon();
     }));
-    sitT = setTimeout(hideSit, 6000);
+    if (dur) sitT = setTimeout(hideSit, dur * 1000);
   }
 
   // ---------- Compter ----------
@@ -91,17 +97,26 @@
     if (h === 'bilan') return vBilan();
     vLecon();
   }
-  function render(html) { $app.innerHTML = html; window.scrollTo(0, 0); }
+  let keepScroll = false;
+  function render(html) { const y = window.scrollY; $app.innerHTML = html; window.scrollTo(0, keepScroll ? y : 0); keepScroll = false; }
   const back = (to) => `<a class="icon-btn" href="${to}" aria-label="Retour"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></a>`;
 
   // ---------- Écran : préparer la leçon ----------
   let draft = null;
   function vSetup() {
+    keepScroll = !!draft;
     const cur = L();
     if (!draft) draft = { initials: cur ? cur.initials : '', worked: cur ? cur.worked.slice() : [], today: cur ? cur.today.slice() : [], mode: cur && cur.worked.length ? 'one' : 'upto', info: '' };
     const d = draft;
-    const grid = Object.keys(REF).map((c) => `<div class="objrow"><span class="objc">${c}</span><div class="objchips">${OBJ.filter((o) => o.comp === c).map((o) => `<button class="oc ${d.worked.includes(o.id) ? 'on' : ''}" data-o="${o.id}" aria-pressed="${d.worked.includes(o.id)}" aria-label="${o.id} ${esc(o.titre)}">${o.n}</button>`).join('')}</div></div>`).join('');
-    const objChecks = Object.keys(REF).map((c) => `<div class="sect" style="margin:10px 0 0">${c}</div>${OBJ.filter((o) => o.comp === c).map((o) => `<label><input type="checkbox" value="${o.id}" ${d.today.includes(o.id) ? 'checked' : ''}><span><b>${o.id}</b> ${esc(o.titre)}</span></label>`).join('')}`).join('');
+    if (!d.open) { const hi = d.worked.length ? OBJ_BY[d.worked.slice().sort((x, y) => OBJ_BY[y].idx - OBJ_BY[x].idx)[0]].comp : 'C1'; d.open = { [hi]: true }; }
+    const grid = Object.keys(REF).map((c) => {
+      const list = OBJ.filter((o) => o.comp === c), n = list.filter((o) => d.worked.includes(o.id)).length;
+      return `<section class="comp" style="--cc:${COLORS[c]}">
+        <button class="comphead" data-c="${c}" aria-expanded="${!!d.open[c]}"><span class="cbadge">${c}</span><span class="ctitle">${esc(REF[c].titre)}</span><span class="ccount">${n}/${list.length}</span></button>
+        ${d.open[c] ? `<div class="objlines">${list.map((o) => `<button class="objline ${d.worked.includes(o.id) ? 'on' : ''}" data-o="${o.id}" aria-pressed="${d.worked.includes(o.id)}"><span class="box" aria-hidden="true">${d.worked.includes(o.id) ? '✓' : ''}</span><span class="otxt"><b>${o.n}.</b> ${esc(o.titre)}</span></button>`).join('')}</div>` : ''}
+      </section>`;
+    }).join('');
+    const objChecks = Object.keys(REF).map((c) => `<div class="sect" style="margin:10px 0 0">${c}</div>${OBJ.filter((o) => o.comp === c).map((o) => `<label><input type="checkbox" value="${o.id}" ${d.today.includes(o.id) ? 'checked' : ''}><span><b>${cd(o.id)}</b> ${esc(o.titre)}</span></label>`).join('')}`).join('');
     render(`
       <div class="row between"><div class="brand">Relevé de leçon</div>${cur ? '<a class="pill" href="#lecon">Reprendre</a>' : ''}</div>
       <div class="field"><label for="ini">Élève (initiales, facultatif)</label><input id="ini" class="input" maxlength="5" autocomplete="off" value="${esc(d.initials)}" placeholder="ex. AC"></div>
@@ -120,6 +135,7 @@
       <div class="card stack" style="gap:4px">
         <div class="switch"><label for="hide" style="font-weight:700">Masquer les erreurs non travaillées</label><input type="checkbox" id="hide" ${S.hide ? 'checked' : ''}></div>
         <div class="switch"><label for="sit" style="font-weight:700">Proposer la situation après une erreur</label><input type="checkbox" id="sit" ${S.sit ? 'checked' : ''}></div>
+        <div class="switch"><label for="sitd" style="font-weight:700">Temps pour choisir la situation</label><select id="sitd" class="input" style="width:auto;min-height:44px">${[[15, '15 s'], [30, '30 s'], [60, '1 min'], [0, 'Jusqu\'à fermeture']].map(([v, t]) => `<option value="${v}" ${(S.sitDur ?? 30) === v ? 'selected' : ''}>${t}</option>`).join('')}</select></div>
         <a class="pill" href="#perso" style="justify-content:space-between;margin-top:6px">Mes erreurs personnalisées (${S.custom.length}) <span aria-hidden="true">›</span></a>
       </div>
       <div class="spacer stack">
@@ -131,11 +147,12 @@
     const sync = () => { d.initials = $app.querySelector('#ini').value.trim().toUpperCase(); d.today = [...$app.querySelectorAll('#today input')].filter((b) => b.checked).map((b) => b.value); };
     $app.querySelector('#ini').addEventListener('input', sync);
     $app.querySelectorAll('[data-m]').forEach((b) => b.addEventListener('click', () => { sync(); d.mode = b.dataset.m; vSetup(); }));
+    $app.querySelectorAll('[data-c]').forEach((b) => b.addEventListener('click', () => { sync(); d.open[b.dataset.c] = !d.open[b.dataset.c]; vSetup(); }));
     $app.querySelectorAll('[data-o]').forEach((b) => b.addEventListener('click', () => {
       sync(); const o = OBJ_BY[b.dataset.o];
-      if (d.mode === 'upto') { d.worked = OBJ.filter((x) => x.idx <= o.idx).map((x) => x.id); d.mode = 'one'; d.info = `Coché jusqu'à ${o.id} · ${o.titre}. Ajuste au besoin.`; }
-      else if (d.worked.includes(o.id)) { d.worked = d.worked.filter((x) => x !== o.id); d.info = `Retiré : ${o.id} · ${o.titre}`; }
-      else { d.worked.push(o.id); d.info = `Ajouté : ${o.id} · ${o.titre}`; }
+      if (d.mode === 'upto') { d.worked = OBJ.filter((x) => x.idx <= o.idx).map((x) => x.id); d.mode = 'one'; d.info = `Coché jusqu'à ${cd(o.id)}. Ajuste au besoin.`; }
+      else if (d.worked.includes(o.id)) { d.worked = d.worked.filter((x) => x !== o.id); d.info = `Retiré : ${cd(o.id)}`; }
+      else { d.worked.push(o.id); d.info = `Ajouté : ${cd(o.id)}`; }
       vSetup();
     }));
     $app.querySelector('#all').addEventListener('click', () => { sync(); d.worked = OBJ.map((x) => x.id); d.info = 'Tout le programme est coché (fin de formation).'; vSetup(); });
@@ -146,6 +163,7 @@
     limit();
     $app.querySelector('#hide').addEventListener('change', (e) => { S.hide = e.target.checked; save(); });
     $app.querySelector('#sit').addEventListener('change', (e) => { S.sit = e.target.checked; save(); });
+    $app.querySelector('#sitd').addEventListener('change', (e) => { S.sitDur = parseInt(e.target.value, 10); save(); });
     $app.querySelector('#go').addEventListener('click', () => {
       sync();
       if (cur && cur.log.length && !confirm('Remettre tous les compteurs à zéro ?')) return;
@@ -158,11 +176,11 @@
 
   // ---------- Écran : erreurs personnalisées ----------
   function vPerso() {
-    const opts = Object.keys(REF).map((c) => `<optgroup label="${c}">${OBJ.filter((o) => o.comp === c).map((o) => `<option value="${o.id}">${o.id} · ${esc(o.titre)}</option>`).join('')}</optgroup>`).join('');
+    const opts = Object.keys(REF).map((c) => `<optgroup label="${c}">${OBJ.filter((o) => o.comp === c).map((o) => `<option value="${o.id}">${cd(o.id)} · ${esc(o.titre)}</option>`).join('')}</optgroup>`).join('');
     const gopts = Object.entries(GRILLE).filter(([k]) => !['bonus'].includes(k)).map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join('');
     render(`<div class="row">${back('#setup')}<h1 style="font-size:24px;font-weight:800">Mes erreurs</h1></div>
       <div class="small muted">Elles s'ajoutent à la liste, sont rattachées à l'objectif choisi et restent enregistrées sur ce téléphone.</div>
-      ${S.custom.length ? `<div class="list">${S.custom.map((e) => `<div class="row-tap" style="cursor:default"><span class="lab">${esc(e.label)}<span class="ref">${e.liens[0][0]} · ${esc(GRILLE[e.grille])}${e.bien ? ' · ✓ ' + esc(e.bien) : ''}</span></span><button class="icon-btn" data-del="${e.id}" aria-label="Supprimer ${esc(e.label)}">✕</button></div>`).join('')}</div>` : ''}
+      ${S.custom.length ? `<div class="list">${S.custom.map((e) => `<div class="row-tap" style="cursor:default"><span class="lab">${esc(e.label)}<span class="ref">${cd(e.liens[0][0])} · ${esc(GRILLE[e.grille])}${e.bien ? ' · ✓ ' + esc(e.bien) : ''}</span></span><button class="icon-btn" data-del="${e.id}" aria-label="Supprimer ${esc(e.label)}">✕</button></div>`).join('')}</div>` : ''}
       <div class="card stack">
         <b>Ajouter une erreur</b>
         <div class="field"><label for="pl">Intitulé de l'erreur</label><input id="pl" class="input" maxlength="40" placeholder="ex. Frein à main oublié"></div>
@@ -188,6 +206,7 @@
   // ---------- Écran : leçon en cours ----------
   function vLecon(hitId, hitKind) {
     const l = L(); if (!l) return vSetup();
+    keepScroll = !!$app.querySelector('.big');
     const total = Object.values(l.counts).reduce((a, b) => a + b, 0);
     const totalOk = Object.values(l.ok).reduce((a, b) => a + b, 0);
     const big = bigList();
@@ -197,7 +216,7 @@
     const tile = (e) => {
       const n = l.counts[e.id] || 0;
       return `<div class="tile2 ${e.elim ? 'elim' : ''} ${hitId === e.id ? 'hit-' + hitKind : ''}">
-        <button class="tap-err" data-id="${e.id}"><span class="lab">${esc(e.label)}</span><span class="foot"><span class="ref">${esc(e.liens.length ? e.liens[0][0] : 'Éliminatoire')}</span><span class="cnt ${n ? '' : 'zero'}">${n}</span></span></button>
+        <button class="tap-err" data-id="${e.id}"><span class="lab">${esc(e.label)}</span><span class="foot"><span class="ref">${esc(e.liens.length ? cd(e.liens[0][0]) : 'Éliminatoire')}</span><span class="cnt ${n ? '' : 'zero'}">${n}</span></span></button>
         ${okBtn(e, 'tap-ok')}</div>`;
     };
     const groups = {};
@@ -207,18 +226,18 @@
       if (!items.length) return '';
       return `<div class="sect">${esc(GRILLE[k])}</div><div class="list">${items.map((e) => {
         const act = isActive(e), n = act ? (l.counts[e.id] || 0) : (l.off[e.id] || 0);
-        return `<div class="row2 ${act ? '' : 'off'} ${!act && n ? 'hasoff' : ''}"><button class="row-tap" data-id="${e.id}" ${act ? '' : 'data-off="1"'}><span class="lab">${e.elim ? '⚠ ' : ''}${e.plus ? '✚ ' : ''}${esc(e.label)}<span class="ref">${esc(e.liens.length ? e.liens[0][0] : '')}${act ? '' : ' · non travaillé · appui long'}</span></span><span class="cnt ${n ? '' : 'zero'}">${n}</span></button>${act && !e.plus ? okBtn(e, 'row-ok') : ''}</div>`;
+        return `<div class="row2 ${act ? '' : 'off'} ${!act && n ? 'hasoff' : ''}"><button class="row-tap" data-id="${e.id}" ${act ? '' : 'data-off="1"'}><span class="lab">${e.elim ? '⚠ ' : ''}${e.plus ? '✚ ' : ''}${esc(e.label)}<span class="ref">${esc(e.liens.length ? cd(e.liens[0][0]) : '')}${act ? '' : ' · non travaillé · appui long'}</span></span><span class="cnt ${n ? '' : 'zero'}">${n}</span></button>${act && !e.plus ? okBtn(e, 'row-ok') : ''}</div>`;
       }).join('')}</div>`;
     }).join('');
     render(`
       <div class="bar-top"><a class="pill" href="#setup">${l.initials ? esc(l.initials) + ' · ' : ''}${l.worked.length} obj.${l.today.length ? ' · ciblée' : ''}</a>
         <span class="total" aria-label="${total} erreurs, ${totalOk} réussites"><span style="color:var(--orange-d)">✗${total}</span> <span style="color:var(--blue-d)">✓${totalOk}</span></span>
         <a class="btn btn-dark" href="#bilan" style="width:auto;min-height:44px;padding:0 16px;font-size:15px">Bilan</a></div>
-      <div class="undo"><span>${last ? 'Dernier : ' + esc(lastTxt) : 'Gauche : erreur · Droite : ✓ réussite'}</span><button id="undo" ${last ? '' : 'disabled'}>Annuler</button></div>
+      <div class="undo"><span>${last ? 'Dernier : ' + esc(lastTxt) : 'Gauche : erreur · Droite : ✓ réussite'}</span><span class="row" style="gap:6px">${last && last.kind === 'err' && !ERR_BY[last.id].plus ? '<button id="sitbtn">Situation</button>' : ''}<button id="undo" ${last ? '' : 'disabled'}>Annuler</button></span></div>
       <div class="big">${big.map(tile).join('')}${tile(ERR_BY.interv)}</div>
       <details ${S.openOthers ? 'open' : ''} id="others"><summary>Autres erreurs et points positifs</summary><div class="stack" style="gap:12px">${rows}</div></details>`);
-    if (S.openOthers && hitId) { const el = $app.querySelector(`[data-id="${hitId}"]`); if (el && !big.includes(ERR_BY[hitId])) el.scrollIntoView({ block: 'center' }); }
     $app.querySelector('#undo').addEventListener('click', undo);
+    const sb = $app.querySelector('#sitbtn'); if (sb) sb.addEventListener('click', () => askSituation(true));
     $app.querySelector('#others').addEventListener('toggle', (e) => { S.openOthers = e.target.open; save(); });
     $app.querySelectorAll('[data-ok]').forEach((b) => b.addEventListener('click', () => count(b.dataset.ok, 'ok')));
     $app.querySelectorAll('[data-id]').forEach((b) => {
@@ -234,7 +253,8 @@
   }
 
   // ---------- Bilan ----------
-  const detail = (e) => e.liens.length ? `${e.liens[0][0]} · ${savoirTxt(e.liens[0])}` : '';
+  const detail = (e) => e.liens.length ? `${cd(e.liens[0][0])} · ${savoirTxt(e.liens[0])}` : '';
+  const code = (e) => e.liens.length ? cd(e.liens[0][0]) : '';
   function sitText(id, kind) {
     const m = {}; L().log.filter((x) => x.id === id && x.kind === kind && x.sit).forEach((x) => { m[x.sit] = (m[x.sit] || 0) + 1; });
     const p = Object.entries(m).sort((a, b) => b[1] - a[1]).map(([s, n]) => `${n} ${s.toLowerCase()}`);
@@ -258,15 +278,15 @@
   function textPro() {
     const { l, errs, elims, plus, strong, later, objs } = buildBilan();
     const d = new Date().toLocaleDateString('fr-FR');
-    const out = [`Bilan de leçon du ${d}${l.initials ? ' — ' + l.initials : ''}${l.today.length ? ' — leçon ciblée : ' + l.today.join(', ') : ''}`];
-    if (strong.length) { out.push('', 'Points forts :'); strong.forEach((r) => out.push(`• ${r.e.bien} ✓${r.ok}${r.n ? ' (✗' + r.n + ')' : ''} → ${detail(r.e)}`)); }
+    const out = [`Bilan de leçon du ${d}${l.initials ? ' — ' + l.initials : ''}${l.today.length ? ' — leçon ciblée : ' + l.today.map(cd).join(', ') : ''}`];
+    if (strong.length) { out.push('', 'Points forts :'); strong.forEach((r) => out.push(`• ${r.e.bien} ✓${r.ok}${r.n ? ' (✗' + r.n + ')' : ''}${code(r.e) ? ' → ' + code(r.e) : ''}`)); }
     if (errs.length) {
       out.push('', 'Points à travailler :');
-      errs.forEach((r) => { const s = sitText(r.e.id, 'err'); out.push(`• ${r.e.label} ${ratio(r)}${s ? ' (' + s + ')' : ''} → ${detail(r.e)} (grille : ${GRILLE[r.e.grille]})`); });
+      errs.forEach((r) => { const s2 = sitText(r.e.id, 'err'); out.push(`• ${r.e.label} ${ratio(r)}${s2 ? ' (' + s2 + ')' : ''}${code(r.e) ? ' → ' + code(r.e) : ''}`); });
     } else if (!elims.length) out.push('', 'Aucune erreur relevée sur les compétences travaillées.');
-    if (objs.length) { out.push('', 'Compétences à revoir :'); objs.forEach(([o, v]) => out.push(`• ${o} ${OBJ_BY[o].titre} (✗${v.n}${v.ok ? ' / ✓' + v.ok : ''})`)); }
-    if (elims.length) { out.push('', 'Situations éliminatoires à l\'examen :'); elims.forEach((r) => { const s = sitText(r.e.id, 'err'); out.push(`• ${r.e.label} ×${r.n}${s ? ' (' + s + ')' : ''}`); }); }
-    if (later.length) { out.push('', 'À venir, déjà repéré (non évalué) :'); later.forEach((r) => out.push(`• ${r.e.label} ×${r.n} → ${detail(r.e)}`)); }
+    if (objs.length) out.push('', 'Compétences à revoir : ' + objs.map(([o, v]) => `${cd(o)} (✗${v.n})`).join(', '));
+    if (elims.length) { out.push('', 'Éliminatoire à l\'examen :'); elims.forEach((r) => { const s2 = sitText(r.e.id, 'err'); out.push(`• ${r.e.label} ×${r.n}${s2 ? ' (' + s2 + ')' : ''}${code(r.e) ? ' → ' + code(r.e) : ''}`); }); }
+    if (later.length) { out.push('', 'À venir, déjà repéré (non évalué) :'); later.forEach((r) => out.push(`• ${r.e.label} ×${r.n}${code(r.e) ? ' → ' + code(r.e) : ''}`)); }
     if (plus.length) out.push('', 'Points positifs : ' + plus.map((r) => r.e.label).join(', ') + '.');
     return out.join('\n');
   }
@@ -291,10 +311,10 @@
     const { l, errs, elims, plus, strong, later, objs } = buildBilan();
     const res = (arr, top) => arr.map((r, i) => { const s = sitText(r.e.id, 'err'); return `<div class="res ${top && i < 3 ? 'top' : ''}"><div class="h"><span>${esc(r.e.label)}</span><b>${esc(r.e.bien ? `✗${r.n} ✓${r.ok}` : '×' + r.n)}</b></div>${s ? `<div class="s"><b>${esc(s)}</b></div>` : ''}${r.e.liens.length ? `<div class="s">${esc(detail(r.e))}<br>Grille : ${esc(GRILLE[r.e.grille])}</div>` : ''}</div>`; }).join('');
     render(`
-      <div class="row">${back('#lecon')}<div><h1 style="font-size:24px;font-weight:800">Bilan de leçon</h1><div class="small muted">${l.initials ? esc(l.initials) + ' · ' : ''}${l.worked.length} objectifs travaillés${l.today.length ? ' · ciblée ' + esc(l.today.join(', ')) : ''}</div></div></div>
+      <div class="row">${back('#lecon')}<div><h1 style="font-size:24px;font-weight:800">Bilan de leçon</h1><div class="small muted">${l.initials ? esc(l.initials) + ' · ' : ''}${l.worked.length} objectifs travaillés${l.today.length ? ' · ciblée ' + esc(l.today.map(cd).join(', ')) : ''}</div></div></div>
       ${strong.length ? `<div class="card" style="border:2px solid var(--blue)"><h2 style="color:var(--blue-d)">Points forts</h2>${strong.map((r) => `<div class="res"><div class="h"><span>${esc(r.e.bien)}</span><b>✓${r.ok}${r.n ? ' ✗' + r.n : ''}</b></div><div class="s">${esc(detail(r.e))}</div></div>`).join('')}</div>` : ''}
       ${errs.length ? `<div class="card"><h2>Points à travailler</h2>${res(errs, true)}</div>` : '<div class="card">Aucune erreur relevée sur les compétences travaillées.</div>'}
-      ${objs.length ? `<div class="card"><h2>Compétences à revoir</h2>${objs.map(([o, v]) => `<div class="res"><div class="h"><span>${o}</span><b>✗${v.n}${v.ok ? ' ✓' + v.ok : ''}</b></div><div class="s">${esc(OBJ_BY[o].titre)}</div></div>`).join('')}</div>` : ''}
+      ${objs.length ? `<div class="card"><h2>Compétences à revoir</h2>${objs.map(([o, v]) => `<div class="res"><div class="h"><span>${cd(o)}</span><b>✗${v.n}${v.ok ? ' ✓' + v.ok : ''}</b></div><div class="s">${esc(OBJ_BY[o].titre)}</div></div>`).join('')}</div>` : ''}
       ${elims.length ? `<div class="card" style="border:2px solid var(--orange)"><h2 style="color:var(--orange-d)">⚠ Éliminatoire à l'examen</h2>${res(elims)}</div>` : ''}
       ${later.length ? `<div class="card" style="opacity:.85"><h2>À venir, déjà repéré</h2><div class="small muted">Non évalué : compétence pas encore travaillée.</div>${later.map((r) => `<div class="res"><div class="h"><span>${esc(r.e.label)}</span><b>×${r.n}</b></div><div class="s">${esc(detail(r.e))}</div></div>`).join('')}</div>` : ''}
       ${plus.length ? `<div class="card" style="border:2px solid var(--blue)"><h2 style="color:var(--blue-d)">✚ Points positifs</h2><div>${plus.map((r) => esc(r.e.label)).join(' · ')}</div></div>` : ''}

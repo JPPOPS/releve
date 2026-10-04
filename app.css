@@ -234,3 +234,27 @@ select.input{appearance:auto}
 .tap-err .foot{display:flex;align-items:flex-end;justify-content:space-between;gap:6px}
 .tap-err .cnt{position:static;font-size:26px}
 .toast{top:calc(env(safe-area-inset-top) + 64px);padding:8px 14px;font-size:14px}
+
+/* ---- v3 : liste des compétences façon Suivi Drive, situation prolongée ---- */
+.comp{border-radius:14px;overflow:hidden;border:1px solid var(--line)}
+.comphead{display:flex;align-items:center;gap:12px;width:100%;min-height:60px;padding:8px 12px 8px 8px;border:0;background:var(--card);cursor:pointer;text-align:left;color:var(--ink)}
+.cbadge{flex-shrink:0;width:52px;height:44px;border-radius:6px;background:var(--cc);color:#fff;font-family:var(--display);font-weight:800;font-size:22px;display:flex;align-items:center;justify-content:center}
+.ctitle{flex:1;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;line-height:1.3}
+.ccount{font-weight:800;font-size:14px;color:var(--cc)}
+.comphead[aria-expanded="true"]{border-bottom:1px solid var(--line)}
+.objlines{background:#F7F5F0}
+.objline{display:flex;align-items:flex-start;gap:12px;width:100%;min-height:52px;padding:10px 12px;border:0;border-bottom:1px solid var(--soft);background:transparent;text-align:left;cursor:pointer;color:var(--ink);font-size:15px;line-height:1.35}
+.objline:last-child{border-bottom:0}
+.objline .box{flex-shrink:0;width:28px;height:28px;border:2px solid var(--ink);border-radius:4px;display:flex;align-items:center;justify-content:center;font-weight:800;background:#fff;color:#fff}
+.objline.on .box{background:var(--cc);border-color:var(--cc)}
+.objline.on .otxt{font-weight:700}
+.objline:active{background:var(--soft)}
+.sitgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.sitgrid button{min-height:52px;border-radius:12px;border:1px solid var(--line2);background:var(--card);font-weight:700;font-size:15px;cursor:pointer;color:var(--ink)}
+.sitgrid button[aria-pressed="true"]{background:var(--ink);color:#fff}
+.sitgrid button:active{background:var(--blue-l)}
+.sitprog{height:4px;border-radius:2px;background:var(--soft);overflow:hidden}
+.sitprog div{height:4px;background:var(--blue);width:100%;animation:sitp linear forwards}
+@keyframes sitp{from{width:100%}to{width:0}}
+body.has-sit #app{padding-bottom:360px}
+.undo button#sitbtn{background:var(--blue-l);border-color:var(--blue-l);color:var(--blue-d)}
