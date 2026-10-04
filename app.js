@@ -265,7 +265,7 @@
     let txt = t.label;
     if (t.opts && st.opts) {
       const o = st.opts, parts = [];
-      if (o.sens) parts.push(o.sens); if (o.cote) parts.push(o.cote);
+      if (o.niveau) parts.push(o.niveau); if (o.sens) parts.push(o.sens); if (o.cote) parts.push(o.cote);
       if (parts.length) txt += ' ' + parts.join(' ');
       if (o.veh) txt += ', ' + o.veh;
     }
@@ -333,7 +333,7 @@
     const errs = rows.filter((r) => r.n && !r.e.plus && !r.e.elim && !r.e.inter).sort((a, b) => b.n - a.n || a.ok - b.ok);
     const plus = rows.filter((r) => r.n && r.e.plus);
     const strong = rows.filter((r) => r.ok && r.ok > r.n && !r.e.plus).sort((a, b) => (b.ok - b.n) - (a.ok - a.n));
-    const worked = THEMES.filter((t) => l.themes[t.id] && l.themes[t.id].kind);
+    const worked = Object.keys(l.themes).map((id) => TH_BY[id]).filter((t) => t && l.themes[t.id].kind); // ordre de saisie = déroulé de la leçon
     const thPlus = THEMES.filter((t) => l.themes[t.id] && l.themes[t.id].plus);
     const eLines = errLines('err', (e) => !e.plus && !e.elim && !e.inter);
     const iLines = errLines('err', (e) => e.inter);
@@ -358,7 +358,7 @@
   }
   function textPro() {
     const b = buildBilan(), l = b.l, out = [];
-    KINDS.forEach((k) => b.worked.filter((t) => l.themes[t.id].kind === k).forEach((t) => out.push(`${k} ${themeText(t, l.themes[t.id])}`)));
+    b.worked.forEach((t) => out.push(`${l.themes[t.id].kind} ${themeText(t, l.themes[t.id])}`));
     const errBlock = b.eLines.map((r) => r.txt).concat(b.elLines.map((r) => r.txt + ' (éliminatoire à l\'examen)')).concat(b.iLines.map((r) => r.txt));
     if (errBlock.length) { if (out.length) out.push(''); out.push(...errBlock); }
     if (b.later.length) out.push('', 'Repéré, pas encore travaillé : ' + b.later.map((r) => lc(r.txt)).join(', '));

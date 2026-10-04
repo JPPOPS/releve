@@ -167,14 +167,19 @@ window.PRIORITE = ["angle", "retro", "cligno", "placement", "calage", "vite", "t
    opts : détails proposés (manœuvres) */
 window.THEME_GROUPS = ["Véhicule et commandes", "Observation", "Circulation", "Manœuvres", "Conditions difficiles", "Autonomie"];
 window.KINDS = ["Vu", "Revu", "Continué", "Abordé"];
-window.HOWS = ["en statique", "sur schéma", "en démonstration", "en circulation", "avec aide", "seul(e)"];
+window.HOWS = ["en statique", "sur schéma", "en démonstration", "en double commande", "en circulation", "avec aide", "seul(e)"];
 window.THEMES = [
   { id: "t_install", g: 0, label: "installation au poste de conduite", obj: ["C1-2"] },
   { id: "t_commandes", g: 0, label: "principales commandes", obj: ["C1-1"] },
+  { id: "t_chaine", g: 0, label: "chaîne cinématique", obj: ["C1-4"] },
+  { id: "t_pedalier", g: 0, label: "pédalier (placement des pieds)", obj: ["C1-1"] },
+  { id: "t_regime", g: 0, label: "régime moteur", obj: ["C1-6"] },
+  { id: "t_freinmoteur", g: 0, label: "frein moteur", obj: ["C1-5"] },
+  { id: "t_rouelibre", g: 0, label: "roue libre", obj: ["C1-5"] },
   { id: "t_verifs", g: 0, label: "vérifications intérieures et extérieures", obj: ["C1-1"] },
   { id: "t_bvstat", g: 0, label: "boîte de vitesses en statique", obj: ["C1-6"] },
-  { id: "t_montee", g: 0, label: "montée des rapports", obj: ["C1-6"] },
-  { id: "t_retro", g: 0, label: "rétrogradage", obj: ["C1-6"] },
+  { id: "t_montee", g: 0, label: "montée des rapports", obj: ["C1-6"], opts: { niveau: ["jusqu'en 3e", "jusqu'en 4e", "jusqu'en 5e", "jusqu'en 6e"] } },
+  { id: "t_retro", g: 0, label: "rétrogradage", obj: ["C1-6"], opts: { niveau: ["3-2", "4-3-2", "5-4-3-2", "6 à 2"] } },
   { id: "t_bvratio", g: 0, label: "utilisation rationnelle de la boîte de vitesses", obj: ["C1-6"] },
   { id: "t_pp", g: 0, label: "point de patinage", obj: ["C1-4"] },
   { id: "t_demplat", g: 0, label: "démarrage sur le plat", obj: ["C1-4"] },
@@ -221,4 +226,4 @@ window.THEMES = [
   { id: "t_exblanc", g: 5, label: "examen blanc", obj: [] },
   { id: "t_bilan", g: 5, label: "bilan intermédiaire", obj: [] }
 ];
-window.OPT_LABELS = { sens: "Sens", cote: "Côté", veh: "Véhicules" };
+window.OPT_LABELS = { niveau: "Jusqu'où", sens: "Sens", cote: "Côté", veh: "Véhicules" };
