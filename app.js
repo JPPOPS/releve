@@ -31,8 +31,9 @@
     const part = h && f.parts ? f.parts.find((p) => p[1] === '#' + h) : null;
     return { titre: f.titre + (part ? ' — ' + part[0].toLowerCase() : ''), url: f.url + (h ? '#' + h : '') };
   };
-  const playBtn = (id) => { const f = ficheOf(id); return f ? `<a class="play" href="${f.url}" aria-label="Fiche : ${esc(f.titre)}">▶</a>` : ''; };
-  const ficheUrl = (f) => new URL(f.url, location.href.split('#')[0]).href;
+  const playBtn = (id) => { const f = ficheOf(id); return f ? `<a class="play" href="${toolUrl(f.url)}" aria-label="Fiche : ${esc(f.titre)}">▶</a>` : ''; };
+  const ficheUrl = (f) => new URL(f.url, location.href.split('#')[0]).href; // lien élève : sans accès à l'outil
+  const toolUrl = (u) => u.replace(/(#|$)/, '?o=1$1'); // ouverture depuis l'outil : le retour ramène à l'outil
   const tabs = (cur) => { const l = L(), n = Object.keys(l.themes || {}).length; return `<div class="seg tabs" role="tablist"><a href="#lecon" role="tab" aria-selected="${cur === 'lecon'}">Erreurs</a><a href="#travail" role="tab" aria-selected="${cur === 'travail'}">Travaillé${n ? ' (' + n + ')' : ''}</a></div>`; };
   let ALL = [], ERR_BY = {};
   function rebuild() { ALL = ERREURS.concat(S.custom); ERR_BY = Object.fromEntries(ALL.map((e) => [e.id, e])); }
@@ -193,10 +194,11 @@
   function vFiches() {
     const items = Object.values(FICHES).map((f) => `<div class="card stack" style="gap:8px">
         <div><div class="small muted" style="font-weight:700">${esc(f.code || '')}</div><h2 style="font-size:20px">${esc(f.titre)}</h2></div>
-        ${(f.parts || [['Ouvrir la fiche', '']]).map(([t, h]) => `<a class="pill" href="${f.url}${h}" style="justify-content:space-between">▶ ${esc(t)} <span aria-hidden="true">›</span></a>`).join('')}
+        ${(f.parts || [['Ouvrir la fiche', '']]).map(([t, h]) => `<a class="pill" href="${toolUrl(f.url + h)}" style="justify-content:space-between">▶ ${esc(t)} <span aria-hidden="true">›</span></a>`).join('')}
         <button class="btn btn-light" data-share="${ficheUrl(f)}">Copier le lien pour l'élève</button></div>`).join('');
     render(`<div class="row">${back('#setup')}<h1 style="font-size:26px;font-weight:800">Fiches explicatives</h1></div>
       <p class="muted" style="margin:0">À montrer en leçon ou à envoyer à l'élève pour réviser. Elles s'ouvrent aussi avec le bouton ▶ pendant la leçon.</p>
+      <button class="btn btn-light" data-share="${FICHES_LISTE}">Copier le lien de toutes les fiches</button>
       ${items}`);
     $app.querySelectorAll('[data-share]').forEach((b) => b.addEventListener('click', () => { navigator.clipboard && navigator.clipboard.writeText(b.dataset.share).then(() => toast('Lien copié'), () => toast(b.dataset.share)); }));
   }

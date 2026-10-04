@@ -229,10 +229,11 @@ window.THEMES = [
 window.OPT_LABELS = { niveau: "Jusqu'où", sens: "Sens", cote: "Côté", veh: "Véhicules" };
 
 /* Fiches explicatives (animation + schéma + texte), reliées aux thèmes et aux erreurs */
+window.FICHES_LISTE = "https://jppops.github.io/jour-j/fiches/";
 window.FICHES = {
-  vif: { titre: "Vérifier, Informer, Faire", url: "fiches/vif.html", code: "C1.8",
+  vif: { titre: "Vérifier, Informer, Faire", url: "https://jppops.github.io/jour-j/fiches/vif.html", code: "C1.8",
     parts: [["Changement de voie", ""], ["Tourner à gauche après un arrêt", "#gauche"]] },
-  chaine: { titre: "La chaîne cinématique", url: "fiches/chaine.html", code: "C1.4 · C1.5 · C1.6",
+  chaine: { titre: "La chaîne cinématique", url: "https://jppops.github.io/jour-j/fiches/chaine.html", code: "C1.4 · C1.5 · C1.6",
     parts: [["Moteur, embrayage, boîte, roues", ""], ["Point de patinage", "#patinage"], ["Régime moteur", "#regime"], ["Frein moteur", "#freinmoteur"], ["Ralentir et rétrograder", "#retrograder"], ["S'arrêter", "#arret"], ["Roue libre", "#rouelibre"], ["Calage", "#calage"], ["Les pieds sur les pédales", "#pieds"], ["La grille de la boîte", "#boite"]] }
 };
 window.FICHE_DE = {

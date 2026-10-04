@@ -1,8 +1,8 @@
 // Cache hors-ligne. Change VERSION à chaque mise à jour pour que les téléphones récupèrent les nouveaux fichiers.
-const VERSION = 'releve-v21';
+const VERSION = 'releve-v23';
 const FILES = [
   './', 'index.html', 'app.css', 'app.js', 'data.js', 'manifest.webmanifest',
-  'mentions-legales.html', 'fiches/vif.html', 'fiches/chaine.html', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png'
+  'mentions-legales.html', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png'
 ];
 
 self.addEventListener('install', (e) => {
@@ -19,7 +19,7 @@ self.addEventListener('activate', (e) => {
 self.addEventListener('fetch', (e) => {
   if (e.request.method !== 'GET') return;
   e.respondWith(
-    caches.match(e.request).then((hit) => hit || fetch(e.request).then((res) => {
+    caches.match(e.request, { ignoreSearch: true }).then((hit) => hit || fetch(e.request).then((res) => {
       if (res.ok && new URL(e.request.url).origin === location.origin) {
         const copy = res.clone();
         caches.open(VERSION).then((c) => c.put(e.request, copy));
