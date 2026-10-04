@@ -25,6 +25,14 @@
   const L = () => S.lesson;
   function ensure() { const l = L(); if (!l) return; l.themes = l.themes || {}; l.pl = l.pl || []; if (l.plNote == null) l.plNote = ''; }
   const TH_BY = Object.fromEntries(THEMES.map((t) => [t.id, t]));
+  const ficheOf = (id) => {
+    const k = window.FICHE_DE && FICHE_DE[id]; if (!k) return null;
+    const [key, h] = k.split('#'), f = FICHES[key]; if (!f) return null;
+    const part = h && f.parts ? f.parts.find((p) => p[1] === '#' + h) : null;
+    return { titre: f.titre + (part ? ' — ' + part[0].toLowerCase() : ''), url: f.url + (h ? '#' + h : '') };
+  };
+  const playBtn = (id) => { const f = ficheOf(id); return f ? `<a class="play" href="${f.url}" aria-label="Fiche : ${esc(f.titre)}">▶</a>` : ''; };
+  const ficheUrl = (f) => new URL(f.url, location.href.split('#')[0]).href;
   const tabs = (cur) => { const l = L(), n = Object.keys(l.themes || {}).length; return `<div class="seg tabs" role="tablist"><a href="#lecon" role="tab" aria-selected="${cur === 'lecon'}">Erreurs</a><a href="#travail" role="tab" aria-selected="${cur === 'travail'}">Travaillé${n ? ' (' + n + ')' : ''}</a></div>`; };
   let ALL = [], ERR_BY = {};
   function rebuild() { ALL = ERREURS.concat(S.custom); ERR_BY = Object.fromEntries(ALL.map((e) => [e.id, e])); }
@@ -96,6 +104,7 @@
     hideSit();
     const h = location.hash.replace('#', '');
     if (h === 'perso') return vPerso();
+    if (h === 'fiches') return vFiches();
     if (!L() || h === 'setup') return vSetup();
     ensure();
     if (h === 'bilan') return vBilan();
@@ -142,6 +151,7 @@
         <div class="switch"><label for="sit" style="font-weight:700">Proposer une précision après une erreur</label><input type="checkbox" id="sit" ${S.sit ? 'checked' : ''}></div>
         <div class="switch"><label for="sitd" style="font-weight:700">Temps pour choisir la précision</label><select id="sitd" class="input" style="width:auto;min-height:44px">${[[15, '15 s'], [30, '30 s'], [60, '1 min'], [0, 'Jusqu\'à fermeture']].map(([v, t]) => `<option value="${v}" ${(S.sitDur ?? 30) === v ? 'selected' : ''}>${t}</option>`).join('')}</select></div>
         <a class="pill" href="#perso" style="justify-content:space-between;margin-top:6px">Mes erreurs personnalisées (${S.custom.length}) <span aria-hidden="true">›</span></a>
+        <a class="pill" href="#fiches" style="justify-content:space-between;margin-top:6px">▶ Fiches explicatives (${Object.keys(FICHES).length}) <span aria-hidden="true">›</span></a>
       </div>
       <div class="spacer stack">
         ${cur ? '<button class="btn btn-primary" id="keep">Appliquer et reprendre la leçon</button>' : ''}
@@ -180,6 +190,16 @@
   }
 
   // ---------- Écran : erreurs personnalisées ----------
+  function vFiches() {
+    const items = Object.values(FICHES).map((f) => `<div class="card stack" style="gap:8px">
+        <div><div class="small muted" style="font-weight:700">${esc(f.code || '')}</div><h2 style="font-size:20px">${esc(f.titre)}</h2></div>
+        ${(f.parts || [['Ouvrir la fiche', '']]).map(([t, h]) => `<a class="pill" href="${f.url}${h}" style="justify-content:space-between">▶ ${esc(t)} <span aria-hidden="true">›</span></a>`).join('')}
+        <button class="btn btn-light" data-share="${ficheUrl(f)}">Copier le lien pour l'élève</button></div>`).join('');
+    render(`<div class="row">${back('#setup')}<h1 style="font-size:26px;font-weight:800">Fiches explicatives</h1></div>
+      <p class="muted" style="margin:0">À montrer en leçon ou à envoyer à l'élève pour réviser. Elles s'ouvrent aussi avec le bouton ▶ pendant la leçon.</p>
+      ${items}`);
+    $app.querySelectorAll('[data-share]').forEach((b) => b.addEventListener('click', () => { navigator.clipboard && navigator.clipboard.writeText(b.dataset.share).then(() => toast('Lien copié'), () => toast(b.dataset.share)); }));
+  }
   function vPerso() {
     const opts = Object.keys(REF).map((c) => `<optgroup label="${c}">${OBJ.filter((o) => o.comp === c).map((o) => `<option value="${o.id}">${cd(o.id)} · ${esc(o.titre)}</option>`).join('')}</optgroup>`).join('');
     const gopts = Object.entries(GRILLE).filter(([k]) => !['bonus'].includes(k)).map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join('');
@@ -233,7 +253,7 @@
       if (!items.length) return '';
       return `<div class="sect">${esc(GRILLE[k])}</div><div class="list">${items.map((e) => {
         const act = isActive(e), n = act ? (l.counts[e.id] || 0) : (l.off[e.id] || 0);
-        return `<div class="row2 ${act ? '' : 'off'} ${!act && n ? 'hasoff' : ''}"><button class="row-tap" data-id="${e.id}" ${act ? '' : 'data-off="1"'}><span class="lab">${e.elim ? '⚠ ' : ''}${e.plus ? '✚ ' : ''}${esc(e.label)}<span class="ref">${esc(e.liens.length ? cd(e.liens[0][0]) : '')}${act ? '' : ' · non travaillé · appui long'}</span></span><span class="cnt ${n ? '' : 'zero'}">${n}</span></button>${act && !e.plus ? okBtn(e, 'row-ok') : ''}</div>`;
+        return `<div class="row2 ${act ? '' : 'off'} ${!act && n ? 'hasoff' : ''}"><button class="row-tap" data-id="${e.id}" ${act ? '' : 'data-off="1"'}><span class="lab">${e.elim ? '⚠ ' : ''}${e.plus ? '✚ ' : ''}${esc(e.label)}<span class="ref">${esc(e.liens.length ? cd(e.liens[0][0]) : '')}${act ? '' : ' · non travaillé · appui long'}</span></span><span class="cnt ${n ? '' : 'zero'}">${n}</span></button>${ficheOf(e.id) ? playBtn(e.id).replace('class="play"', 'class="play row-play"') : ''}${act && !e.plus ? okBtn(e, 'row-ok') : ''}</div>`;
       }).join('')}</div>`;
     }).join('');
     render(`
@@ -281,7 +301,7 @@
       const opts = t.opts ? Object.entries(t.opts).map(([k, vals]) => `<div class="optrow"><span class="small muted">${esc(OPT_LABELS[k])}</span>${vals.map((v) => `<button data-opt="${t.id}|${k}|${esc(v)}" aria-pressed="${!!(st.opts && st.opts[k] === v)}">${esc(v)}</button>`).join('')}</div>`).join('') : '';
       return `<div class="th ${on ? 'on' : ''}">
         <div class="th-top"><span class="th-lab">${esc(t.label.replace(/^./, (c) => c.toUpperCase()))}</span>
-          <span class="row" style="gap:4px">${p ? `<button class="th-minus" data-minus="${t.id}" aria-label="Retirer un plus">−</button>` : ''}<button class="th-plus ${p ? 'has' : ''}" data-plus="${t.id}" aria-label="Point positif">${p ? '+'.repeat(Math.min(p, 5)) : '+'}</button></span></div>
+          <span class="row" style="gap:4px">${playBtn(t.id)}${p ? `<button class="th-minus" data-minus="${t.id}" aria-label="Retirer un plus">−</button>` : ''}<button class="th-plus ${p ? 'has' : ''}" data-plus="${t.id}" aria-label="Point positif">${p ? '+'.repeat(Math.min(p, 5)) : '+'}</button></span></div>
         <div class="kinds">${KINDS.map((k) => `<button data-kind="${t.id}|${k}" aria-pressed="${st.kind === k}">${k}</button>`).join('')}</div>
         ${on ? `<div class="hows">${HOWS.map((h) => `<button data-how="${t.id}|${esc(h)}" aria-pressed="${!!(st.how && st.how.includes(h))}">${esc(h)}</button>`).join('')}</div>${opts}` : ''}
       </div>`;
@@ -370,12 +390,17 @@
   }
   function textEleve() {
     const b = buildBilan(), l = b.l, out = ['Bilan de ta leçon :'];
-    if (b.worked.length) out.push('', 'Aujourd\'hui : ' + b.worked.map((t) => lc(themeText(t, { opts: l.themes[t.id].opts }))).join(', ') + '.');
+    if (b.worked.length) out.push('', 'Aujourd\'hui : ' + b.worked.map((t) => themeText(t, { opts: l.themes[t.id].opts })).join(', ') + '.');
     const pos = positives(b);
     out.push('', pos.length ? 'Ce qui va bien : ' + pos.slice(0, 4).join(', ') + '.' : 'Merci pour ta leçon, on continue à progresser ensemble.');
     const top = b.eLines.slice(0, 3);
     if (top.length) { out.push('', 'À travailler :'); top.forEach((r, i) => out.push(`${i + 1}. ${r.txt.replace(/ ×(\d+)$/, ' ($1 fois)')}`)); }
     if (b.elLines.length) out.push('', 'Attention : ' + b.elLines.map((r) => lc(r.e.label)).join(', ') + '. À l\'examen, c\'est éliminatoire : on le retravaille en priorité.');
+    const fs = [];
+    const addF = (f) => { if (f && !fs.some((x) => x.url === f.url)) fs.push(f); };
+    b.eLines.concat(b.elLines).forEach((r) => addF(ficheOf(r.e.id)));
+    b.worked.forEach((t) => addF(ficheOf(t.id)));
+    if (fs.length) { out.push('', 'Pour réviser :'); fs.forEach((f) => out.push(`• ${f.titre} : ${ficheUrl(f)}`)); }
     const pl = plText(l);
     if (pl) out.push('', 'Prochaine leçon : ' + pl + '.');
     out.push('', 'Bonne continuation !');
@@ -389,7 +414,7 @@
     const b = buildBilan(), l = b.l;
     keepScroll = !!$app.querySelector('#pl-box');
     const plChips = THEME_GROUPS.map((g, i) => `<div class="sect" style="margin:8px 0 2px">${esc(g)}</div><div class="plchips">${THEMES.filter((t) => t.g === i).map((t) => `<button data-pl="${t.id}" aria-pressed="${l.pl.includes(t.id)}">${esc(uc(t.label))}</button>`).join('')}</div>`).join('');
-    const lines = (arr) => arr.map((r) => `<div class="res"><div class="h"><span>${esc(r.e.label)}${r.sit ? ' — ' + esc(lc(r.sit)) : ''}</span><b>×${r.n}</b></div>${r.e.liens.length ? `<div class="s">${esc(detail(r.e))}</div>` : ''}</div>`).join('');
+    const lines = (arr) => arr.map((r) => `<div class="res"><div class="h"><span>${esc(r.e.label)}${r.sit ? ' — ' + esc(lc(r.sit)) : ''}</span><span class="row" style="gap:8px">${playBtn(r.e.id)}<b>×${r.n}</b></span></div>${r.e.liens.length ? `<div class="s">${esc(detail(r.e))}</div>` : ''}</div>`).join('');
     const pos = positives(b);
     render(`
       <div class="row">${back('#lecon')}<div><h1 style="font-size:24px;font-weight:800">Bilan de leçon</h1><div class="small muted">${l.initials ? esc(l.initials) + ' · ' : ''}${l.worked.length} objectifs travaillés</div></div></div>

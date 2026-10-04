@@ -325,6 +325,7 @@
     Object.values(SC).forEach((c) => { $(c.stage).hidden = c !== cur; });
     [...$('scen').children].forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.sc === key)));
     buildSteps(); go(0);
+    try { history.replaceState(null, '', key === 'turn' ? '#gauche' : location.pathname + location.search); } catch (e) {}
   }
   $('scen').addEventListener('click', (e) => { const b = e.target.closest('button[data-sc]'); if (b) setScen(b.dataset.sc); });
   function draw(p) {
@@ -345,6 +346,7 @@
   $('restart').addEventListener('click', () => go(0));
   buildSteps();
   if (location.hash === '#gauche') setScen('turn');
+  window.addEventListener('hashchange', () => setScen(location.hash === '#gauche' ? 'turn' : 'lane'));
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) { paused = true; pauseAt = performance.now(); $('play').textContent = '▶ Lecture'; }
   requestAnimationFrame(loop);
 })();

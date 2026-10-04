@@ -227,3 +227,14 @@ window.THEMES = [
   { id: "t_bilan", g: 5, label: "bilan intermédiaire", obj: [] }
 ];
 window.OPT_LABELS = { niveau: "Jusqu'où", sens: "Sens", cote: "Côté", veh: "Véhicules" };
+
+/* Fiches explicatives (animation + schéma + texte), reliées aux thèmes et aux erreurs */
+window.FICHES = {
+  vif: { titre: "Vérifier, Informer, Faire", url: "fiches/vif.html", code: "C1.8",
+    parts: [["Changement de voie", ""], ["Tourner à gauche après un arrêt", "#gauche"]] }
+};
+window.FICHE_DE = {
+  t_vif: "vif", t_chgvoie: "vif",
+  angle: "vif", retro: "vif", cligno: "vif", cligno2: "vif",
+  t_tournerg: "vif#gauche", tourner: "vif#gauche"
+};
