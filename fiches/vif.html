@@ -278,25 +278,25 @@
   }
 
   // ---------- Scénario 2 : tourner à gauche après un arrêt ----------
-  const TX = 210, TY = 290, MX2 = 135;
+  const TX = 210, TY = 170, MX2 = 135;
   // Trajectoire du virage : tout droit, quart de cercle, puis vers la gauche
   function turnPath(p) {
-    const q = ease(p), C = { x: 118, y: 205 }, R = TX - C.x;
-    if (q < .3) return { x: TX, y: lerp(TY, C.y, q / .3), h: 0 };
-    if (q < .75) { const th = (q - .3) / .45 * Math.PI / 2; return { x: C.x + R * Math.cos(th), y: C.y - R * Math.sin(th), h: -th * 180 / Math.PI }; }
-    return { x: lerp(C.x, 34, (q - .75) / .25), y: C.y - R, h: -90 };
+    const q = ease(p), C = { x: 160, y: 160 }, R = TX - C.x;
+    if (q < .1) return { x: TX, y: lerp(TY, C.y, q / .1), h: 0 };
+    if (q < .6) { const th = (q - .1) / .5 * Math.PI / 2; return { x: C.x + R * Math.cos(th), y: C.y - R * Math.sin(th), h: -th * 180 / Math.PI }; }
+    return { x: lerp(C.x, 34, (q - .6) / .4), y: C.y - R, h: -90 };
   }
   const TURN = [
-    { d: 3800, t: 'Situation', k: 'Situation', s: 'J\'ai fait mon VIF pour me placer près de l\'axe, clignotant gauche mis. Je m\'arrête : la voiture d\'en face est prioritaire, je la laisse passer.',
+    { d: 3800, t: 'Situation', k: 'Situation', s: 'J\'ai fait mon VIF, clignotant gauche mis, et je me suis avancé au centre de l\'intersection. Je m\'arrête : la voiture d\'en face est prioritaire, je la laisse passer.',
       f: (p) => ({ opp: lerp(-60, 600, p), moto: 700, head: 0, blink: true }) },
     { d: 3600, t: 'Pendant l\'attente : les rétroviseurs', k: 'Rétros', s: 'J\'attends, mais je surveille mes rétroviseurs : une moto arrive derrière moi et se décale pour me dépasser par la gauche.',
-      f: (p) => ({ opp: 700, moto: lerp(640, 420, p), head: 0, blink: true, focus: 1, keep: 'z_rear' }) },
+      f: (p) => ({ opp: 700, moto: lerp(640, 295, p), head: 0, blink: true, focus: 1, keep: 'z_rear' }) },
     { d: 4000, t: 'En face, c\'est libre… mais', k: 'Angle mort', s: 'La voie d\'en face est dégagée. Pourtant la moto sort des rétros et entre dans mon angle mort gauche. Si je tourne sans regarder, je lui coupe la route.',
-      f: (p) => ({ opp: 700, moto: lerp(420, 320, ease(p)), head: 0, blink: true, focus: 1, keep: 'z_rear' }) },
+      f: (p) => ({ opp: 700, moto: lerp(295, 195, ease(p)), head: 0, blink: true, focus: 1, keep: 'z_rear' }) },
     { d: 4200, t: '1. Revérifier : l\'angle mort', k: 'Coup d\'œil', s: 'Avant de tourner, coup d\'œil vers l\'épaule gauche : ma vision périphérique capte la moto. Je ne bouge pas, je la laisse passer.',
-      f: (p) => ({ opp: 700, moto: lerp(320, 305, p), head: -90 * ease(Math.min(1, p * 2)), blink: true, focus: 1, stop: p > .45 ? 1 : 0, ping: p > .45 }) },
+      f: (p) => ({ opp: 700, moto: lerp(195, 188, p), head: -90 * ease(Math.min(1, p * 2)), blink: true, focus: 1, stop: p > .45 ? 1 : 0, ping: p > .45 }) },
     { d: 3800, t: 'Revérifier encore', k: 'Libre', s: 'La moto est passée. Rétroviseur, angle mort, en face : tout est libre. Je peux tourner.',
-      f: (p) => ({ opp: 700, moto: lerp(305, -60, ease(p)), head: p < .5 ? lerp(-90, 0, ease(p * 2)) : (p < .75 ? 0 : -90 * ease((p - .75) * 4)), blink: true, focus: 1, tick: p > .85 ? 1 : 0 }) },
+      f: (p) => ({ opp: 700, moto: lerp(188, -60, ease(p)), head: p < .5 ? lerp(-90, 0, ease(p * 2)) : (p < .75 ? 0 : -90 * ease((p - .75) * 4)), blink: true, focus: 1, tick: p > .85 ? 1 : 0 }) },
     { d: 4200, t: '3. Faire', k: 'Faire', s: 'Je tourne à gauche en coupant la voie d\'en face franchement, puis je m\'assure que le clignotant est bien annulé.',
       f: (p) => ({ opp: 700, moto: -60, head: 0, blink: p < .8, car: turnPath(p), novision: true }) }
   ];
