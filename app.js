@@ -23,6 +23,9 @@
   try { S = Object.assign(fresh(), JSON.parse(localStorage.getItem(KEY)) || {}); } catch (e) { S = fresh(); }
   function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { /* */ } }
   const L = () => S.lesson;
+  function ensure() { const l = L(); if (!l) return; l.themes = l.themes || {}; l.pl = l.pl || []; if (l.plNote == null) l.plNote = ''; }
+  const TH_BY = Object.fromEntries(THEMES.map((t) => [t.id, t]));
+  const tabs = (cur) => { const l = L(), n = Object.keys(l.themes || {}).length; return `<div class="seg tabs" role="tablist"><a href="#lecon" role="tab" aria-selected="${cur === 'lecon'}">Erreurs</a><a href="#travail" role="tab" aria-selected="${cur === 'travail'}">Travaillé${n ? ' (' + n + ')' : ''}</a></div>`; };
   let ALL = [], ERR_BY = {};
   function rebuild() { ALL = ERREURS.concat(S.custom); ERR_BY = Object.fromEntries(ALL.map((e) => [e.id, e])); }
   rebuild();
@@ -34,7 +37,7 @@
   }
   function bigList() {
     const l = L(), out = [];
-    const push = (e) => { if (e && !out.includes(e) && !e.plus && e.id !== 'interv' && isActive(e)) out.push(e); };
+    const push = (e) => { if (e && !out.includes(e) && !e.plus && !e.inter && isActive(e)) out.push(e); };
     if (l.today.length) ALL.filter((e) => e.liens.some((x) => l.today.includes(x[0]))).forEach(push);
     else {
       const last3 = l.worked.slice().sort((a, b) => OBJ_BY[b].idx - OBJ_BY[a].idx).slice(0, 3);
@@ -58,9 +61,9 @@
     const l = L(), last = l.log[l.log.length - 1]; if (!last) return;
     const dur = S.sitDur || 0;
     const bar = document.createElement('div'); bar.className = 'sitbar';
-    bar.innerHTML = `<div class="row between"><div class="small" style="font-weight:700">Situation : ${esc(ERR_BY[last.id].label)} <span class="muted" style="font-weight:400">(facultatif)</span></div><button class="icon-btn" id="sitx" aria-label="Fermer" style="width:40px;height:40px">✕</button></div>
+    bar.innerHTML = `<div class="row between"><div class="small" style="font-weight:700">Précision : ${esc(ERR_BY[last.id].label)} <span class="muted" style="font-weight:400">(facultatif)</span></div><button class="icon-btn" id="sitx" aria-label="Fermer" style="width:40px;height:40px">✕</button></div>
       ${dur ? `<div class="sitprog"><div style="animation-duration:${dur}s"></div></div>` : ''}
-      <div class="sitgrid">${SITUATIONS.map((s2) => `<button data-s="${esc(s2)}" ${last.sit === s2 ? 'aria-pressed="true"' : ''}>${esc(s2)}</button>`).join('')}</div>`;
+      <div class="sitgrid">${(PRECISIONS[last.id] || ERR_BY[last.id].precisions || SITUATIONS).map((s2) => `<button data-s="${esc(s2)}" ${last.sit === s2 ? 'aria-pressed="true"' : ''}>${esc(s2)}</button>`).join('')}</div>`;
     document.body.appendChild(bar); document.body.classList.add('has-sit');
     bar.querySelector('#sitx').addEventListener('click', hideSit);
     bar.querySelectorAll('[data-s]').forEach((b) => b.addEventListener('click', () => {
@@ -94,7 +97,9 @@
     const h = location.hash.replace('#', '');
     if (h === 'perso') return vPerso();
     if (!L() || h === 'setup') return vSetup();
+    ensure();
     if (h === 'bilan') return vBilan();
+    if (h === 'travail') return vTravail();
     vLecon();
   }
   let keepScroll = false;
@@ -134,8 +139,8 @@
         <div class="objlist" id="today">${objChecks}</div></details>
       <div class="card stack" style="gap:4px">
         <div class="switch"><label for="hide" style="font-weight:700">Masquer les erreurs non travaillées</label><input type="checkbox" id="hide" ${S.hide ? 'checked' : ''}></div>
-        <div class="switch"><label for="sit" style="font-weight:700">Proposer la situation après une erreur</label><input type="checkbox" id="sit" ${S.sit ? 'checked' : ''}></div>
-        <div class="switch"><label for="sitd" style="font-weight:700">Temps pour choisir la situation</label><select id="sitd" class="input" style="width:auto;min-height:44px">${[[15, '15 s'], [30, '30 s'], [60, '1 min'], [0, 'Jusqu\'à fermeture']].map(([v, t]) => `<option value="${v}" ${(S.sitDur ?? 30) === v ? 'selected' : ''}>${t}</option>`).join('')}</select></div>
+        <div class="switch"><label for="sit" style="font-weight:700">Proposer une précision après une erreur</label><input type="checkbox" id="sit" ${S.sit ? 'checked' : ''}></div>
+        <div class="switch"><label for="sitd" style="font-weight:700">Temps pour choisir la précision</label><select id="sitd" class="input" style="width:auto;min-height:44px">${[[15, '15 s'], [30, '30 s'], [60, '1 min'], [0, 'Jusqu\'à fermeture']].map(([v, t]) => `<option value="${v}" ${(S.sitDur ?? 30) === v ? 'selected' : ''}>${t}</option>`).join('')}</select></div>
         <a class="pill" href="#perso" style="justify-content:space-between;margin-top:6px">Mes erreurs personnalisées (${S.custom.length}) <span aria-hidden="true">›</span></a>
       </div>
       <div class="spacer stack">
@@ -185,6 +190,7 @@
         <b>Ajouter une erreur</b>
         <div class="field"><label for="pl">Intitulé de l'erreur</label><input id="pl" class="input" maxlength="40" placeholder="ex. Frein à main oublié"></div>
         <div class="field"><label for="pb">Intitulé de la réussite (facultatif)</label><input id="pb" class="input" maxlength="40" placeholder="ex. Frein à main desserré"></div>
+        <div class="field"><label for="pp">Précisions proposées (facultatif, séparées par des virgules)</label><input id="pp" class="input" maxlength="200" placeholder="ex. Démarrage, Stationnement en côte"></div>
         <div class="field"><label for="po">Objectif du livret</label><select id="po" class="input">${opts}</select></div>
         <div class="field"><label for="pg">Case de la grille</label><select id="pg" class="input">${gopts}</select></div>
         <div class="check"><input type="checkbox" id="pe"><label for="pe" style="font-weight:400">Éliminatoire à l'examen</label></div>
@@ -199,6 +205,7 @@
       const bien = $app.querySelector('#pb').value.trim();
       const e = { id: 'u' + Date.now(), label, liens: [[$app.querySelector('#po').value, 0]], grille: $app.querySelector('#pg').value, custom: true };
       if (bien) e.bien = bien; if ($app.querySelector('#pe').checked) e.elim = true;
+      const pr = $app.querySelector('#pp').value.split(',').map((x) => x.trim()).filter(Boolean).slice(0, 12); if (pr.length) e.precisions = pr;
       S.custom.push(e); save(); rebuild(); toast('Erreur ajoutée'); vPerso();
     });
   }
@@ -216,11 +223,11 @@
     const tile = (e) => {
       const n = l.counts[e.id] || 0;
       return `<div class="tile2 ${e.elim ? 'elim' : ''} ${hitId === e.id ? 'hit-' + hitKind : ''}">
-        <button class="tap-err" data-id="${e.id}"><span class="lab">${esc(e.label)}</span><span class="foot"><span class="ref">${esc(e.liens.length ? cd(e.liens[0][0]) : 'Éliminatoire')}</span><span class="cnt ${n ? '' : 'zero'}">${n}</span></span></button>
+        <button class="tap-err" data-id="${e.id}"><span class="lab">${esc(e.label)}</span><span class="foot"><span class="ref">${esc(e.liens.length ? cd(e.liens[0][0]) : (e.elim ? 'Éliminatoire' : 'Hors grille'))}</span><span class="cnt ${n ? '' : 'zero'}">${n}</span></span></button>
         ${okBtn(e, 'tap-ok')}</div>`;
     };
     const groups = {};
-    ALL.forEach((e) => { if (big.includes(e) || e.id === 'interv') return; const k = e.plus ? 'bonus' : e.grille; (groups[k] = groups[k] || []).push(e); });
+    ALL.forEach((e) => { if (big.includes(e) || e.inter) return; const k = e.plus ? 'bonus' : e.grille; (groups[k] = groups[k] || []).push(e); });
     const rows = Object.keys(GRILLE).filter((k) => groups[k]).map((k) => {
       const items = groups[k].filter((e) => isActive(e) || !S.hide || l.off[e.id]);
       if (!items.length) return '';
@@ -233,8 +240,9 @@
       <div class="bar-top"><a class="pill" href="#setup">${l.initials ? esc(l.initials) + ' · ' : ''}${l.worked.length} obj.${l.today.length ? ' · ciblée' : ''}</a>
         <span class="total" aria-label="${total} erreurs, ${totalOk} réussites"><span style="color:var(--orange-d)">✗${total}</span> <span style="color:var(--blue-d)">✓${totalOk}</span></span>
         <a class="btn btn-dark" href="#bilan" style="width:auto;min-height:44px;padding:0 16px;font-size:15px">Bilan</a></div>
-      <div class="undo"><span>${last ? 'Dernier : ' + esc(lastTxt) : 'Gauche : erreur · Droite : ✓ réussite'}</span><span class="row" style="gap:6px">${last && last.kind === 'err' && !ERR_BY[last.id].plus ? '<button id="sitbtn">Situation</button>' : ''}<button id="undo" ${last ? '' : 'disabled'}>Annuler</button></span></div>
-      <div class="big">${big.map(tile).join('')}${tile(ERR_BY.interv)}</div>
+      ${tabs('lecon')}
+      <div class="undo"><span>${last ? 'Dernier : ' + esc(lastTxt) : 'Gauche : erreur · Droite : ✓ réussite'}</span><span class="row" style="gap:6px">${last && last.kind === 'err' && !ERR_BY[last.id].plus ? '<button id="sitbtn">Préciser</button>' : ''}<button id="undo" ${last ? '' : 'disabled'}>Annuler</button></span></div>
+      <div class="big">${big.map(tile).join('')}${ALL.filter((e) => e.inter).map(tile).join('')}</div>
       <details ${S.openOthers ? 'open' : ''} id="others"><summary>Autres erreurs et points positifs</summary><div class="stack" style="gap:12px">${rows}</div></details>`);
     $app.querySelector('#undo').addEventListener('click', undo);
     const sb = $app.querySelector('#sitbtn'); if (sb) sb.addEventListener('click', () => askSituation(true));
@@ -252,54 +260,124 @@
     });
   }
 
+  // ---------- Écran : travaillé aujourd'hui ----------
+  const themeText = (t, st) => {
+    let txt = t.label;
+    if (t.opts && st.opts) {
+      const o = st.opts, parts = [];
+      if (o.sens) parts.push(o.sens); if (o.cote) parts.push(o.cote);
+      if (parts.length) txt += ' ' + parts.join(' ');
+      if (o.veh) txt += ', ' + o.veh;
+    }
+    if (st.how && st.how.length) txt += ' (' + st.how.join(', ') + ')';
+    return txt;
+  };
+  function vTravail() {
+    const l = L(); if (!l) return vSetup();
+    keepScroll = !!$app.querySelector('.thg');
+    S.openG = S.openG || { 0: true };
+    const row = (t) => {
+      const st = l.themes[t.id] || {}, on = !!st.kind, p = st.plus || 0;
+      const opts = t.opts ? Object.entries(t.opts).map(([k, vals]) => `<div class="optrow"><span class="small muted">${esc(OPT_LABELS[k])}</span>${vals.map((v) => `<button data-opt="${t.id}|${k}|${esc(v)}" aria-pressed="${!!(st.opts && st.opts[k] === v)}">${esc(v)}</button>`).join('')}</div>`).join('') : '';
+      return `<div class="th ${on ? 'on' : ''}">
+        <div class="th-top"><span class="th-lab">${esc(t.label.replace(/^./, (c) => c.toUpperCase()))}</span>
+          <span class="row" style="gap:4px">${p ? `<button class="th-minus" data-minus="${t.id}" aria-label="Retirer un plus">−</button>` : ''}<button class="th-plus ${p ? 'has' : ''}" data-plus="${t.id}" aria-label="Point positif">${p ? '+'.repeat(Math.min(p, 5)) : '+'}</button></span></div>
+        <div class="kinds">${KINDS.map((k) => `<button data-kind="${t.id}|${k}" aria-pressed="${st.kind === k}">${k}</button>`).join('')}</div>
+        ${on ? `<div class="hows">${HOWS.map((h) => `<button data-how="${t.id}|${esc(h)}" aria-pressed="${!!(st.how && st.how.includes(h))}">${esc(h)}</button>`).join('')}</div>${opts}` : ''}
+      </div>`;
+    };
+    const groups = THEME_GROUPS.map((g, i) => {
+      const list = THEMES.filter((t) => t.g === i), n = list.filter((t) => l.themes[t.id]).length;
+      return `<section class="thg"><button class="thg-head" data-g="${i}" aria-expanded="${!!S.openG[i]}"><span>${esc(g)}</span><span class="small muted">${n ? n + ' noté' + (n > 1 ? 's' : '') : ''}</span></button>${S.openG[i] ? `<div class="thg-list">${list.map(row).join('')}</div>` : ''}</section>`;
+    }).join('');
+    render(`
+      <div class="bar-top"><a class="pill" href="#setup">${l.initials ? esc(l.initials) + ' · ' : ''}${l.worked.length} obj.</a><span class="total"></span>
+        <a class="btn btn-dark" href="#bilan" style="width:auto;min-height:44px;padding:0 16px;font-size:15px">Bilan</a></div>
+      ${tabs('travail')}
+      <div class="small muted">Touche Vu, Revu, Continué ou Abordé, puis précise comment. Le « + » valorise un progrès.</div>
+      <div class="stack" style="gap:10px">${groups}</div>`);
+    const st = (id) => (l.themes[id] = l.themes[id] || {});
+    const clean = (id) => { const x = l.themes[id]; if (x && !x.kind && !x.plus) delete l.themes[id]; };
+    const done = () => { save(); vTravail(); };
+    $app.querySelectorAll('[data-g]').forEach((b) => b.addEventListener('click', () => { S.openG[b.dataset.g] = !S.openG[b.dataset.g]; done(); }));
+    $app.querySelectorAll('[data-kind]').forEach((b) => b.addEventListener('click', () => { const [id, k] = b.dataset.kind.split('|'); const x = st(id); x.kind = x.kind === k ? null : k; clean(id); done(); }));
+    $app.querySelectorAll('[data-how]').forEach((b) => b.addEventListener('click', () => { const [id, h] = b.dataset.how.split('|'); const x = st(id); x.how = x.how || []; x.how = x.how.includes(h) ? x.how.filter((y) => y !== h) : x.how.concat(h); done(); }));
+    $app.querySelectorAll('[data-opt]').forEach((b) => b.addEventListener('click', () => { const [id, k, v] = b.dataset.opt.split('|'); const x = st(id); x.opts = x.opts || {}; x.opts[k] = x.opts[k] === v ? undefined : v; done(); }));
+    $app.querySelectorAll('[data-plus]').forEach((b) => b.addEventListener('click', () => { const x = st(b.dataset.plus); x.plus = (x.plus || 0) + 1; if (navigator.vibrate) navigator.vibrate([20, 40, 20]); done(); }));
+    $app.querySelectorAll('[data-minus]').forEach((b) => b.addEventListener('click', () => { const x = st(b.dataset.minus); x.plus = Math.max(0, (x.plus || 0) - 1); clean(b.dataset.minus); done(); }));
+  }
+
   // ---------- Bilan ----------
   const detail = (e) => e.liens.length ? `${cd(e.liens[0][0])} · ${savoirTxt(e.liens[0])}` : '';
-  const code = (e) => e.liens.length ? cd(e.liens[0][0]) : '';
+  const lc = (t) => t.replace(/^./, (c) => c.toLowerCase());
+  const uc = (t) => t.replace(/^./, (c) => c.toUpperCase());
   function sitText(id, kind) {
     const m = {}; L().log.filter((x) => x.id === id && x.kind === kind && x.sit).forEach((x) => { m[x.sit] = (m[x.sit] || 0) + 1; });
     const p = Object.entries(m).sort((a, b) => b[1] - a[1]).map(([s, n]) => `${n} ${s.toLowerCase()}`);
     return p.length ? `dont ${p.join(', ')}` : '';
   }
+  // erreurs regroupées par précision : « Angle mort oublié — changement de voie ×2 »
+  function errLines(kind, filter) {
+    const m = new Map();
+    L().log.filter((x) => x.kind === kind && ERR_BY[x.id] && filter(ERR_BY[x.id])).forEach((x) => {
+      const k = x.id + '|' + (x.sit || ''); m.set(k, (m.get(k) || 0) + 1);
+    });
+    return [...m.entries()].map(([k, n]) => { const [id, sit] = k.split('|'); return { e: ERR_BY[id], sit, n }; })
+      .sort((a, b) => b.n - a.n || a.e.label.localeCompare(b.e.label))
+      .map((r) => ({ ...r, txt: `${r.e.label}${r.sit ? ' — ' + lc(r.sit) : ''} ×${r.n}` }));
+  }
   function buildBilan() {
     const l = L();
     const ids = new Set(Object.keys(l.counts).concat(Object.keys(l.ok)));
     const rows = [...ids].map((id) => ({ e: ERR_BY[id], n: l.counts[id] || 0, ok: l.ok[id] || 0 })).filter((r) => r.e);
-    const errs = rows.filter((r) => r.n && !r.e.plus && !r.e.elim).sort((a, b) => b.n - a.n || a.ok - b.ok);
-    const elims = rows.filter((r) => r.n && r.e.elim).sort((a, b) => b.n - a.n);
+    const errs = rows.filter((r) => r.n && !r.e.plus && !r.e.elim && !r.e.inter).sort((a, b) => b.n - a.n || a.ok - b.ok);
     const plus = rows.filter((r) => r.n && r.e.plus);
     const strong = rows.filter((r) => r.ok && r.ok > r.n && !r.e.plus).sort((a, b) => (b.ok - b.n) - (a.ok - a.n));
-    const later = Object.entries(l.off).filter(([, n]) => n).map(([id, n]) => ({ e: ERR_BY[id], n })).filter((r) => r.e).sort((a, b) => b.n - a.n);
-    const byObj = {};
-    rows.forEach((r) => { if (!r.e.liens.length || r.e.plus) return; const o = r.e.liens[0][0]; byObj[o] = byObj[o] || { n: 0, ok: 0 }; byObj[o].n += r.n; byObj[o].ok += r.ok; });
-    const objs = Object.entries(byObj).filter(([, v]) => v.n).sort((a, b) => b[1].n - a[1].n || OBJ_BY[a[0]].idx - OBJ_BY[b[0]].idx);
-    return { l, errs, elims, plus, strong, later, objs };
+    const worked = THEMES.filter((t) => l.themes[t.id] && l.themes[t.id].kind);
+    const thPlus = THEMES.filter((t) => l.themes[t.id] && l.themes[t.id].plus);
+    const eLines = errLines('err', (e) => !e.plus && !e.elim && !e.inter);
+    const iLines = errLines('err', (e) => e.inter);
+    const elLines = errLines('err', (e) => e.elim && !e.inter);
+    const later = errLines('off', () => true);
+    // aide « à cocher dans Suivi Drive »
+    const ck = {};
+    const mark = (o, tag) => { (ck[o] = ck[o] || new Set()).add(tag); };
+    worked.forEach((t) => t.obj.forEach((o) => mark(o, ['Vu', 'Abordé'].includes(l.themes[t.id].kind) ? 'abordé' : 'travaillé')));
+    rows.forEach((r) => { if (r.e.liens.length && !r.e.plus && r.n > r.ok) mark(r.e.liens[0][0], 'à revoir'); });
+    const check = Object.entries(ck).sort((a, b) => OBJ_BY[a[0]].idx - OBJ_BY[b[0]].idx);
+    return { l, errs, plus, strong, worked, thPlus, eLines, iLines, elLines, later, check };
   }
-  const ratio = (r) => r.e.bien ? `✗${r.n} / ✓${r.ok}` : `×${r.n}`;
+  function positives(b) {
+    return b.thPlus.map((t) => `${lc(t.label)} ${'+'.repeat(b.l.themes[t.id].plus)}`)
+      .concat(b.strong.map((r) => `${lc(r.e.bien)} ×${r.ok}`))
+      .concat(b.plus.map((r) => lc(r.e.label)));
+  }
+  function plText(l) {
+    const p = l.pl.map((id) => TH_BY[id] && TH_BY[id].label).filter(Boolean);
+    return p.concat(l.plNote.trim() ? [l.plNote.trim()] : []).join(' / ');
+  }
   function textPro() {
-    const { l, errs, elims, plus, strong, later, objs } = buildBilan();
-    const d = new Date().toLocaleDateString('fr-FR');
-    const out = [`Bilan de leçon du ${d}${l.initials ? ' — ' + l.initials : ''}${l.today.length ? ' — leçon ciblée : ' + l.today.map(cd).join(', ') : ''}`];
-    if (strong.length) { out.push('', 'Points forts :'); strong.forEach((r) => out.push(`• ${r.e.bien} ✓${r.ok}${r.n ? ' (✗' + r.n + ')' : ''}${code(r.e) ? ' → ' + code(r.e) : ''}`)); }
-    if (errs.length) {
-      out.push('', 'Points à travailler :');
-      errs.forEach((r) => { const s2 = sitText(r.e.id, 'err'); out.push(`• ${r.e.label} ${ratio(r)}${s2 ? ' (' + s2 + ')' : ''}${code(r.e) ? ' → ' + code(r.e) : ''}`); });
-    } else if (!elims.length) out.push('', 'Aucune erreur relevée sur les compétences travaillées.');
-    if (objs.length) out.push('', 'Compétences à revoir : ' + objs.map(([o, v]) => `${cd(o)} (✗${v.n})`).join(', '));
-    if (elims.length) { out.push('', 'Éliminatoire à l\'examen :'); elims.forEach((r) => { const s2 = sitText(r.e.id, 'err'); out.push(`• ${r.e.label} ×${r.n}${s2 ? ' (' + s2 + ')' : ''}${code(r.e) ? ' → ' + code(r.e) : ''}`); }); }
-    if (later.length) { out.push('', 'À venir, déjà repéré (non évalué) :'); later.forEach((r) => out.push(`• ${r.e.label} ×${r.n}${code(r.e) ? ' → ' + code(r.e) : ''}`)); }
-    if (plus.length) out.push('', 'Points positifs : ' + plus.map((r) => r.e.label).join(', ') + '.');
-    return out.join('\n');
+    const b = buildBilan(), l = b.l, out = [];
+    KINDS.forEach((k) => b.worked.filter((t) => l.themes[t.id].kind === k).forEach((t) => out.push(`${k} ${themeText(t, l.themes[t.id])}`)));
+    const errBlock = b.eLines.map((r) => r.txt).concat(b.elLines.map((r) => r.txt + ' (éliminatoire à l\'examen)')).concat(b.iLines.map((r) => r.txt));
+    if (errBlock.length) { if (out.length) out.push(''); out.push(...errBlock); }
+    if (b.later.length) out.push('', 'Repéré, pas encore travaillé : ' + b.later.map((r) => lc(r.txt)).join(', '));
+    const pos = positives(b);
+    if (pos.length) out.push('', 'Points positifs : ' + pos.join(', '));
+    const pl = plText(l);
+    if (pl) out.push('', 'Prochaine leçon : ' + pl);
+    return out.join('\n').trim() || 'Rien de noté pour cette leçon.';
   }
   function textEleve() {
-    const { errs, elims, plus, strong } = buildBilan();
-    const out = ['Bilan de ta leçon :'];
-    const good = strong.slice(0, 3).map((r) => `${r.e.bien.toLowerCase()} (${r.ok} fois)`).concat(plus.map((r) => r.e.label.toLowerCase()));
-    out.push('', good.length ? 'Ce qui va bien : ' + good.join(', ') + '.' : 'Merci pour ta leçon, on continue à progresser ensemble.');
-    if (errs.length) {
-      out.push('', 'À travailler pour la prochaine fois :');
-      errs.slice(0, 3).forEach((r, i) => out.push(`${i + 1}. ${r.e.label} (${r.n} fois)${r.e.liens.length ? ' — ' + savoirTxt(r.e.liens[0]).replace(/^Savoir /, '').replace(/^./, (c) => c.toUpperCase()) : ''}`));
-    }
-    if (elims.length) out.push('', 'Attention : ' + elims.map((r) => `${r.e.label.toLowerCase()} (${r.n} fois)`).join(', ') + '. À l\'examen, c\'est éliminatoire, on le retravaille en priorité.');
+    const b = buildBilan(), l = b.l, out = ['Bilan de ta leçon :'];
+    if (b.worked.length) out.push('', 'Aujourd\'hui : ' + b.worked.map((t) => lc(themeText(t, { opts: l.themes[t.id].opts }))).join(', ') + '.');
+    const pos = positives(b);
+    out.push('', pos.length ? 'Ce qui va bien : ' + pos.slice(0, 4).join(', ') + '.' : 'Merci pour ta leçon, on continue à progresser ensemble.');
+    const top = b.eLines.slice(0, 3);
+    if (top.length) { out.push('', 'À travailler :'); top.forEach((r, i) => out.push(`${i + 1}. ${r.txt.replace(/ ×(\d+)$/, ' ($1 fois)')}`)); }
+    if (b.elLines.length) out.push('', 'Attention : ' + b.elLines.map((r) => lc(r.e.label)).join(', ') + '. À l\'examen, c\'est éliminatoire : on le retravaille en priorité.');
+    const pl = plText(l);
+    if (pl) out.push('', 'Prochaine leçon : ' + pl + '.');
     out.push('', 'Bonne continuation !');
     return out.join('\n');
   }
@@ -308,22 +386,30 @@
     catch (e) { const ta = document.createElement('textarea'); ta.value = txt; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); toast(msg); } catch (x) { toast('Copie impossible'); } ta.remove(); }
   }
   function vBilan() {
-    const { l, errs, elims, plus, strong, later, objs } = buildBilan();
-    const res = (arr, top) => arr.map((r, i) => { const s = sitText(r.e.id, 'err'); return `<div class="res ${top && i < 3 ? 'top' : ''}"><div class="h"><span>${esc(r.e.label)}</span><b>${esc(r.e.bien ? `✗${r.n} ✓${r.ok}` : '×' + r.n)}</b></div>${s ? `<div class="s"><b>${esc(s)}</b></div>` : ''}${r.e.liens.length ? `<div class="s">${esc(detail(r.e))}<br>Grille : ${esc(GRILLE[r.e.grille])}</div>` : ''}</div>`; }).join('');
+    const b = buildBilan(), l = b.l;
+    keepScroll = !!$app.querySelector('#pl-box');
+    const plChips = THEME_GROUPS.map((g, i) => `<div class="sect" style="margin:8px 0 2px">${esc(g)}</div><div class="plchips">${THEMES.filter((t) => t.g === i).map((t) => `<button data-pl="${t.id}" aria-pressed="${l.pl.includes(t.id)}">${esc(uc(t.label))}</button>`).join('')}</div>`).join('');
+    const lines = (arr) => arr.map((r) => `<div class="res"><div class="h"><span>${esc(r.e.label)}${r.sit ? ' — ' + esc(lc(r.sit)) : ''}</span><b>×${r.n}</b></div>${r.e.liens.length ? `<div class="s">${esc(detail(r.e))}</div>` : ''}</div>`).join('');
+    const pos = positives(b);
     render(`
-      <div class="row">${back('#lecon')}<div><h1 style="font-size:24px;font-weight:800">Bilan de leçon</h1><div class="small muted">${l.initials ? esc(l.initials) + ' · ' : ''}${l.worked.length} objectifs travaillés${l.today.length ? ' · ciblée ' + esc(l.today.map(cd).join(', ')) : ''}</div></div></div>
-      ${strong.length ? `<div class="card" style="border:2px solid var(--blue)"><h2 style="color:var(--blue-d)">Points forts</h2>${strong.map((r) => `<div class="res"><div class="h"><span>${esc(r.e.bien)}</span><b>✓${r.ok}${r.n ? ' ✗' + r.n : ''}</b></div><div class="s">${esc(detail(r.e))}</div></div>`).join('')}</div>` : ''}
-      ${errs.length ? `<div class="card"><h2>Points à travailler</h2>${res(errs, true)}</div>` : '<div class="card">Aucune erreur relevée sur les compétences travaillées.</div>'}
-      ${objs.length ? `<div class="card"><h2>Compétences à revoir</h2>${objs.map(([o, v]) => `<div class="res"><div class="h"><span>${cd(o)}</span><b>✗${v.n}${v.ok ? ' ✓' + v.ok : ''}</b></div><div class="s">${esc(OBJ_BY[o].titre)}</div></div>`).join('')}</div>` : ''}
-      ${elims.length ? `<div class="card" style="border:2px solid var(--orange)"><h2 style="color:var(--orange-d)">⚠ Éliminatoire à l'examen</h2>${res(elims)}</div>` : ''}
-      ${later.length ? `<div class="card" style="opacity:.85"><h2>À venir, déjà repéré</h2><div class="small muted">Non évalué : compétence pas encore travaillée.</div>${later.map((r) => `<div class="res"><div class="h"><span>${esc(r.e.label)}</span><b>×${r.n}</b></div><div class="s">${esc(detail(r.e))}</div></div>`).join('')}</div>` : ''}
-      ${plus.length ? `<div class="card" style="border:2px solid var(--blue)"><h2 style="color:var(--blue-d)">✚ Points positifs</h2><div>${plus.map((r) => esc(r.e.label)).join(' · ')}</div></div>` : ''}
+      <div class="row">${back('#lecon')}<div><h1 style="font-size:24px;font-weight:800">Bilan de leçon</h1><div class="small muted">${l.initials ? esc(l.initials) + ' · ' : ''}${l.worked.length} objectifs travaillés</div></div></div>
+      ${b.worked.length ? `<div class="card"><h2>Travaillé</h2>${b.worked.map((t) => `<div class="res"><div class="h"><span>${esc(l.themes[t.id].kind)} ${esc(themeText(t, l.themes[t.id]))}</span></div></div>`).join('')}</div>` : `<a class="card" href="#travail" style="text-decoration:none;color:inherit">Rien de noté dans « Travaillé ». <b style="color:var(--blue-d)">Ajouter</b></a>`}
+      ${pos.length ? `<div class="card" style="border:2px solid var(--blue)"><h2 style="color:var(--blue-d)">Points positifs</h2><div>${pos.map(esc).join(' · ')}</div></div>` : ''}
+      ${b.eLines.length ? `<div class="card"><h2>Erreurs</h2>${lines(b.eLines)}</div>` : ''}
+      ${b.elLines.length || b.iLines.length ? `<div class="card" style="border:2px solid var(--orange)"><h2 style="color:var(--orange-d)">Interventions et éliminatoires</h2>${lines(b.elLines.concat(b.iLines))}</div>` : ''}
+      ${b.later.length ? `<div class="card" style="opacity:.85"><h2>Repéré, pas encore travaillé</h2>${lines(b.later)}</div>` : ''}
+      <div class="card stack" id="pl-box"><h2>Prochaine leçon</h2>
+        <details ${l.pl.length ? 'open' : ''}><summary>Choisir des thèmes${l.pl.length ? ' (' + l.pl.length + ')' : ''}</summary>${plChips}</details>
+        <label for="pln" class="small muted">Note libre</label><textarea id="pln" class="input" rows="2" style="padding:10px 14px;min-height:64px">${esc(l.plNote)}</textarea></div>
+      ${b.check.length ? `<div class="card"><h2>À cocher dans Suivi Drive</h2><div class="small muted">Aide uniquement : n'apparaît pas dans le texte copié.</div>${b.check.map(([o, tags]) => `<div class="res"><div class="h"><span>${cd(o)} ${esc(OBJ_BY[o].titre)}</span></div><div class="s"><b>${[...tags].join(', ')}</b></div></div>`).join('')}</div>` : ''}
       <div class="spacer stack">
         <button class="btn btn-primary" id="cpro">Copier pour Suivi Drive</button>
         <button class="btn btn-light" id="celv">Copier le message pour l'élève</button>
         <button class="btn btn-light" id="new" style="border-color:var(--orange);color:var(--orange-d)">Nouvelle leçon (remise à zéro)</button>
       </div>`);
-    $app.querySelector('#cpro').addEventListener('click', () => copy(textPro(), 'Bilan détaillé copié'));
+    $app.querySelectorAll('[data-pl]').forEach((x) => x.addEventListener('click', () => { const id = x.dataset.pl; l.pl = l.pl.includes(id) ? l.pl.filter((y) => y !== id) : l.pl.concat(id); save(); vBilan(); }));
+    $app.querySelector('#pln').addEventListener('input', (e) => { l.plNote = e.target.value; save(); });
+    $app.querySelector('#cpro').addEventListener('click', () => copy(textPro(), 'Bilan copié'));
     $app.querySelector('#celv').addEventListener('click', () => copy(textEleve(), 'Message élève copié'));
     $app.querySelector('#new').addEventListener('click', () => {
       if (!confirm('Remettre à zéro et préparer une nouvelle leçon ?')) return;

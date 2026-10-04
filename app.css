@@ -258,3 +258,25 @@ select.input{appearance:auto}
 @keyframes sitp{from{width:100%}to{width:0}}
 body.has-sit #app{padding-bottom:360px}
 .undo button#sitbtn{background:var(--blue-l);border-color:var(--blue-l);color:var(--blue-d)}
+
+/* ---- v4 : onglets, travaillé, prochaine leçon ---- */
+.tabs a{min-height:40px;border-radius:10px;font-weight:700;display:flex;align-items:center;justify-content:center;text-decoration:none;color:var(--ink2)}
+.tabs a[aria-selected="true"]{background:var(--card);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.thg{border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--card)}
+.thg-head{display:flex;justify-content:space-between;align-items:center;width:100%;min-height:52px;padding:0 14px;border:0;background:var(--card);font-weight:800;font-size:16px;cursor:pointer;color:var(--ink);font-family:var(--display)}
+.thg-head[aria-expanded="true"]{border-bottom:1px solid var(--line)}
+.th{padding:10px 12px;border-bottom:1px solid var(--soft);display:flex;flex-direction:column;gap:8px}
+.th:last-child{border-bottom:0}
+.th.on{background:#F3F6FD}
+.th-top{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.th-lab{font-weight:700;font-size:15px;line-height:1.3}
+.th-plus,.th-minus{min-width:44px;height:40px;border-radius:12px;border:1px solid var(--line2);background:var(--card);font-weight:800;font-size:18px;cursor:pointer;color:var(--blue-d);padding:0 10px}
+.th-plus.has{background:var(--blue);border-color:var(--blue);color:#fff}
+.th-minus{color:var(--muted);min-width:40px}
+.kinds{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+.kinds button,.hows button,.optrow button,.plchips button{min-height:40px;border-radius:10px;border:1px solid var(--line2);background:var(--card);font-size:14px;font-weight:700;cursor:pointer;color:var(--ink2);padding:0 8px}
+.kinds button[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:#fff}
+.hows,.optrow,.plchips{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.hows button[aria-pressed="true"],.optrow button[aria-pressed="true"],.plchips button[aria-pressed="true"]{background:var(--blue);border-color:var(--blue);color:#fff}
+.optrow .small{width:70px}
+textarea.input{font-family:inherit;resize:vertical}
