@@ -445,6 +445,8 @@
   window.__releve = { textPro, textEleve };
   route();
   if ('serviceWorker' in navigator && location.protocol === 'https:') {
-    window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => { /* */ }); });
+    const hadCtrl = !!navigator.serviceWorker.controller; let reloaded = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => { if (hadCtrl && !reloaded) { reloaded = true; location.reload(); } });
+    window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then((r) => r.update()).catch(() => { /* */ }); });
   }
 })();
