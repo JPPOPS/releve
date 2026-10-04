@@ -280,3 +280,15 @@ body.has-sit #app{padding-bottom:360px}
 .hows button[aria-pressed="true"],.optrow button[aria-pressed="true"],.plchips button[aria-pressed="true"]{background:var(--blue);border-color:var(--blue);color:#fff}
 .optrow .small{width:70px}
 textarea.input{font-family:inherit;resize:vertical}
+.play{display:inline-flex;align-items:center;justify-content:center;min-width:40px;height:40px;border-radius:12px;background:#16181D;color:#fff;text-decoration:none;font-size:15px;flex-shrink:0}
+.row-play{border-radius:0;height:auto;min-width:48px;align-self:stretch}
+
+/* Dictée vocale */
+#mic{position:fixed;right:16px;bottom:calc(env(safe-area-inset-bottom) + 18px);width:72px;height:72px;border-radius:36px;border:0;background:var(--ink);color:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 18px rgba(0,0,0,.3);z-index:45;touch-action:none;-webkit-user-select:none;user-select:none;cursor:pointer}
+#mic.on{background:#E5484D;transform:scale(1.12);box-shadow:0 0 0 10px rgba(229,72,77,.25)}
+body.has-sit #mic{display:none}
+body:has(#mic) main{padding-bottom:110px}
+.vlive{position:fixed;left:16px;right:100px;bottom:calc(env(safe-area-inset-bottom) + 26px);background:var(--card);border:2px solid #E5484D;border-radius:14px;padding:12px 14px;font-weight:700;z-index:45;box-shadow:0 6px 18px rgba(0,0,0,.15)}
+.vcands{display:grid;grid-template-columns:1fr;gap:6px;max-height:46vh;overflow:auto}
+.vcands button{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:48px;padding:0 12px;border-radius:12px;border:1px solid var(--line2);background:var(--card);font-weight:700;font-size:15px;text-align:left;cursor:pointer;color:var(--ink)}
+.vcands i{font-style:normal;color:#fff;border-radius:8px;padding:3px 7px;font-size:12px;flex-shrink:0}

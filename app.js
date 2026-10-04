@@ -98,12 +98,169 @@
     save(); hideSit(); if (navigator.vibrate) navigator.vibrate(15); toast(`Annulé : ${last.kind === 'ok' ? ERR_BY[last.id].bien : ERR_BY[last.id].label}`); vLecon();
   }
 
+  // ---------- Dictée vocale (essai) ----------
+  // Appui maintenu sur le micro, une phrase courte (« angle mort changement de voie », « bien rétro »,
+  // « travaillé créneau »). Reconnaissance par mots-clés, sans intelligence artificielle.
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const norm = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/['’-]/g, ' ').replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
+  const STOPW = new Set('le la les un une des de du d l a au aux en et ou sur pour par avec sans pas ne non il elle on a fait trop mal tres bon bonne est c ca ce cette son sa ses lui je j me m oublie oubliee oublies'.split(' '));
+  const stem = (w) => (w.length > 5 ? w.slice(0, 5) : w.replace(/s$/, ''));
+  const toks = (s) => norm(s).split(' ').filter((w) => w.length > 1 && !STOPW.has(w)).map(stem);
+  // Expressions parlées → erreur (en plus des mots du libellé)
+  const SYN = {
+    angle: ['angle mort', 'angles morts', 'epaule', 'coup d oeil'], retro: ['retro', 'retroviseur', 'retros', 'miroir'],
+    cligno: ['clignotant', 'cligno', 'pas de clignotant'], cligno2: ['clignotant tard', 'clignotant trop tard', 'mauvais clignotant', 'clignotant pas annule', 'clignotant non annule', 'clignotant reste'],
+    calage: ['cale', 'calage', 'il a cale', 'elle a cale'], cote: ['en cote', 'recul en cote', 'recule en cote', 'demarrage en cote'],
+    arret: ['arret', 'arrete', 'arret imprecis'], accel: ['accelere', 'acceleration', 'a coup', 'gaz'],
+    frein: ['freine', 'freinage', 'frein', 'pile'], rapport: ['rapport', 'sous regime', 'sur regime', 'retrograde', 'retrogradage', 'mauvaise vitesse'],
+    levier: ['levier', 'regarde le levier', 'regarde la boite'], volant: ['volant', 'trajectoire', 'louvoie', 'zigzag', 'tenue des mains'],
+    regard: ['regard', 'regarde trop pres', 'regarde pas loin', 'yeux'], mar: ['marche arriere', 'demi tour'],
+    rangement: ['creneau', 'epi', 'bataille', 'rangement', 'garer'], panneau: ['panneau', 'indice formel', 'marquage', 'sens interdit', 'panneau non vu'],
+    indice: ['indice informel', 'pieton', 'velo', 'trottinette', 'moto', 'bus', 'enfant', 'ballon', 'portiere'],
+    inter: ['intersection', 'carrefour'], vite: ['trop vite', 'vite', 'vitesse excessive', 'allure'], lent: ['trop lent', 'lent', 'hesite', 'hesitant', 'hesitation'],
+    virage: ['virage', 'courbe'], limit: ['limitation', 'limite', 'km h', 'kilometre heure'], stop: ['stop'],
+    prio: ['priorite', 'priorite a droite', 'cedez', 'cedez le passage', 'refus de priorite'], feu: ['feu rouge', 'feu orange', 'grille le feu'],
+    ligne: ['ligne continue', 'ligne blanche'], priotourne: ['priorite en tournant', 'en tournant'],
+    placement: ['placement', 'trop a droite', 'trop a gauche', 'au milieu', 'mal place'], voie: ['mauvaise voie', 'choix de voie', 'preselection'],
+    tourner: ['placement pour tourner', 'pas au centre', 'tourne large', 'coupe le virage a gauche'], giratoire: ['giratoire', 'rond point', 'rondpoint'],
+    insertion: ['insertion', 'insere', 'voie rapide', 'bretelle', 'voie d insertion'], depass: ['depassement', 'depasse', 'rabattement', 'rabat'],
+    distance: ['distance', 'trop pres', 'colle', 'distance de securite'], lateral: ['ecart lateral', 'lateral', 'frole'],
+    anticip: ['anticipation', 'anticipe', 'pas anticipe'], itin: ['direction', 'itineraire', 'gps', 'sortie ratee'],
+    inst: ['installation', 'siege', 'ceinture', 'reglage'], iv_volant: ['intervention volant', 'je reprends le volant', 'coup de volant'],
+    iv_pedales: ['intervention pedale', 'intervention pedales', 'double commande', 'freine pour lui', 'freine pour elle'], iv_verbale: ['intervention verbale'],
+    courtoisie: ['courtoisie', 'courtois'], eco: ['eco conduite', 'econome', 'economique']
+  };
+  const OK_WORDS = ['bien', 'bravo', 'reussi', 'reussie', 'super', 'nickel', 'parfait', 'correct'];
+  const TH_WORDS = { travaille: 'Vu', vu: 'Vu', revu: 'Revu', continue: 'Continué', aborde: 'Abordé' };
+  const hasPhrase = (txt, p) => (' ' + txt + ' ').includes(' ' + norm(p) + ' ');
+  function scoreItem(txt, tk, phrases, label) {
+    let s = 0, ph = '';
+    // une expression reconnue vaut plus si elle est longue et dite en premier (« calage, en côte » : l'erreur d'abord, la précision ensuite)
+    phrases.forEach((p) => { const np = norm(p); if (!hasPhrase(txt, np)) return; const i = (' ' + txt + ' ').indexOf(' ' + np + ' '); const v = 1 + np.split(' ').length + 1.5 * Math.max(0, 1 - i / Math.max(1, txt.length)); if (v > s) { s = v; ph = np; } });
+    const used = toks(ph), lt = toks(label); let hit = 0; lt.forEach((w) => { if (tk.includes(w) && !used.includes(w)) hit++; });
+    return { s: s + hit * (s ? .3 : .6), ph };
+  }
+  function bestPrecision(e, txt) {
+    const opts = PRECISIONS[e.id] || e.precisions || []; const tk = toks(txt);
+    let best = null, bs = 0;
+    opts.forEach((o) => { const ot = toks(o); if (!ot.length) return; const hit = ot.filter((w) => tk.includes(w)).length; const sc = hit / ot.length + (hasPhrase(txt, o) ? 1 : 0); if (hit && sc > bs && sc >= .5) { bs = sc; best = o; } });
+    return best;
+  }
+  function parseVoice(raw) {
+    const txt = norm(raw), first = txt.split(' ')[0];
+    S.vl = S.vl || {};
+    // 1. thème travaillé
+    if (TH_WORDS[first]) {
+      const rest = txt.split(' ').slice(1).join(' '), tk = toks(rest);
+      const ranked = THEMES.map((t) => ({ t, s: scoreItem(rest, tk, [t.label], t.label).s })).filter((x) => x.s > 0).sort((a, b) => b.s - a.s);
+      return { type: 'theme', kind: TH_WORDS[first], ranked, txt };
+    }
+    // 2. réussite ou erreur
+    const okKind = OK_WORDS.some((w) => (' ' + txt + ' ').includes(' ' + w + ' '));
+    const clean = OK_WORDS.reduce((t, w) => (' ' + t + ' ').replace(' ' + w + ' ', ' ').trim(), txt);
+    const tk = toks(clean);
+    const lesson = L();
+    const ranked = ALL.filter((e) => !okKind || e.bien).map((e) => {
+      const r0 = scoreItem(clean, tk, (SYN[e.id] || []).concat(e.syn || []), e.label + ' ' + (e.bien || '')); let s = r0.s;
+      const rest = r0.ph ? (' ' + clean + ' ').replace(' ' + r0.ph + ' ', ' ').trim() : clean;
+      if (s > 0 && !okKind && rest && bestPrecision(e, rest)) s += 1; // le reste de la phrase correspond à une précision de cette erreur
+      if (s > 0 && lesson && isActive(e)) s += .5; // priorité aux compétences du jour
+      return { e, s };
+    }).filter((x) => x.s > 0).sort((a, b) => b.s - a.s);
+    const learned = S.vl[clean] && ERR_BY[S.vl[clean]];
+    return { type: okKind ? 'ok' : 'err', ranked, txt: clean, learned };
+  }
+  function recordVoice(e, kind, txt) {
+    const l = L(); const act = isActive(e);
+    const k = kind === 'ok' ? 'ok' : (act ? 'err' : 'off');
+    const b = bag(k); b[e.id] = (b[e.id] || 0) + 1;
+    const entry = { id: e.id, kind: k, voice: true }; const sit = k !== 'ok' ? bestPrecision(e, txt) : null; if (sit) entry.sit = sit;
+    l.log.push(entry); save();
+    if (navigator.vibrate) navigator.vibrate(k === 'ok' ? [20, 40, 20] : 35);
+    toast(`🎙 ${k === 'ok' ? '✓ ' + e.bien : '+1 ' + e.label}${sit ? ' · ' + sit : ''}${k === 'off' ? ' (non travaillé)' : ''}`);
+    if (location.hash === '#travail') vTravail(); else vLecon(e.id, k === 'ok' ? 'ok' : 'err');
+    if (k === 'err' && !sit && !e.plus) askSituation();
+  }
+  function recordTheme(t, kind) {
+    const l = L(); ensure(); const x = (l.themes[t.id] = l.themes[t.id] || {}); x.kind = kind; save();
+    toast(`🎙 ${kind} ${t.label}`); if (location.hash === '#travail') vTravail(); else vLecon();
+  }
+  function addNote(raw) { const l = L(); l.notes = l.notes || []; l.notes.push(raw); save(); toast('🎙 Gardé en note : ' + raw); }
+  function handleVoice(raw) {
+    if (!L() || !raw) return;
+    const r = parseVoice(raw);
+    if (r.type === 'theme') {
+      const [a, b] = r.ranked;
+      if (a && a.s >= 1.2 && (!b || b.s < a.s * .8)) return recordTheme(a.t, r.kind);
+      return voiceSheet(raw, r);
+    }
+    if (r.learned) return recordVoice(r.learned, r.type, r.txt);
+    const [a, b] = r.ranked;
+    if (a && a.s >= 2 && (!b || a.s - b.s >= 1.2)) return recordVoice(a.e, r.type, r.txt);
+    voiceSheet(raw, r);
+  }
+  // Pas compris : on propose les erreurs les plus proches, puis celles des compétences du jour
+  function voiceSheet(raw, r) {
+    hideSit();
+    const l = L(); let cands, title;
+    if (r.type === 'theme') {
+      cands = r.ranked.slice(0, 5).map((x) => ({ id: x.t.id, lab: x.t.label, code: x.t.obj && x.t.obj[0] }));
+      if (!cands.length) cands = THEMES.filter((t) => t.obj.some((o) => l.worked.includes(o) || l.today.includes(o))).slice(0, 6).map((t) => ({ id: t.id, lab: t.label, code: t.obj[0] }));
+      title = 'Quel thème ?';
+    } else {
+      const seen = new Set(); cands = [];
+      const push = (e) => { if (e && !seen.has(e.id) && (r.type !== 'ok' || e.bien)) { seen.add(e.id); cands.push({ id: e.id, lab: r.type === 'ok' ? e.bien : e.label, code: e.liens.length ? e.liens[0][0] : '' }); } };
+      r.ranked.slice(0, 4).forEach((x) => push(x.e));
+      bigList().forEach((e) => { if (cands.length < 7) push(e); });
+      title = r.ranked.length ? 'Tu voulais dire ?' : 'Pas compris. Compétences du jour :';
+    }
+    const bar = document.createElement('div'); bar.className = 'sitbar';
+    bar.innerHTML = `<div class="row between"><div class="small" style="font-weight:700">${esc(title)} <span class="muted" style="font-weight:400">« ${esc(raw)} »</span></div><button class="icon-btn" id="sitx" aria-label="Fermer" style="width:40px;height:40px">✕</button></div>
+      <div class="vcands">${cands.map((c) => `<button data-v="${c.id}"><span>${esc(c.lab)}</span>${c.code ? `<i style="background:${COLORS[c.code.split('-')[0]] || '#5A5F6B'}">${cd(c.code)}</i>` : ''}</button>`).join('')}</div>
+      <button class="btn btn-light" id="vnote" style="min-height:44px">Garder en note libre</button>`;
+    document.body.appendChild(bar); document.body.classList.add('has-sit');
+    bar.querySelector('#sitx').addEventListener('click', hideSit);
+    bar.querySelector('#vnote').addEventListener('click', () => { hideSit(); addNote(raw); });
+    bar.querySelectorAll('[data-v]').forEach((x) => x.addEventListener('click', () => {
+      hideSit(); const id = x.dataset.v;
+      if (r.type === 'theme') return recordTheme(TH_BY[id], r.kind);
+      if (r.txt && r.txt.split(' ').length <= 6) { S.vl = S.vl || {}; S.vl[r.txt] = id; } // retenu pour la prochaine fois
+      recordVoice(ERR_BY[id], r.type, r.txt);
+    }));
+  }
+  // Bouton micro : appui maintenu pour parler
+  let rec = null, heard = '', live = null;
+  function micUI() {
+    let m = document.getElementById('mic');
+    const show = S.voice && SR && L() && ['lecon', 'travail', ''].includes(location.hash.replace('#', ''));
+    if (!show) { if (m) m.remove(); return; }
+    if (m) return;
+    m = document.createElement('button'); m.id = 'mic'; m.setAttribute('aria-label', 'Dicter (appui maintenu)');
+    m.innerHTML = '<svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>';
+    document.body.appendChild(m);
+    const start = (ev) => {
+      ev.preventDefault(); if (rec) return; heard = '';
+      try { rec = new SR(); } catch (x) { toast('Dictée indisponible'); return; }
+      rec.lang = 'fr-FR'; rec.interimResults = true; rec.continuous = true; rec.maxAlternatives = 1;
+      rec.onresult = (e2) => { heard = Array.from(e2.results).map((x) => x[0].transcript).join(' '); if (live) live.textContent = heard || '…'; };
+      rec.onerror = (e2) => { if (e2.error === 'not-allowed' || e2.error === 'service-not-allowed') toast('Micro refusé : autorise-le dans Chrome'); else if (e2.error === 'network') toast('Dictée : pas de réseau'); };
+      rec.onend = () => { m.classList.remove('on'); if (live) { live.remove(); live = null; } rec = null; const t = heard.trim(); if (t) handleVoice(t); };
+      try { rec.start(); } catch (x) { rec = null; return; }
+      m.classList.add('on'); if (navigator.vibrate) navigator.vibrate(15);
+      live = document.createElement('div'); live.className = 'vlive'; live.textContent = 'J\'écoute…'; document.body.appendChild(live);
+    };
+    const stop = () => { if (rec) setTimeout(() => { try { rec.stop(); } catch (x) { /* */ } }, 350); };
+    m.addEventListener('pointerdown', start); m.addEventListener('pointerup', stop); m.addEventListener('pointercancel', stop); m.addEventListener('pointerleave', stop);
+    m.addEventListener('contextmenu', (e) => e.preventDefault());
+  }
+
   // ---------- Navigation ----------
   function go(h) { if (location.hash === h) route(); else location.hash = h; }
   window.addEventListener('hashchange', route);
   function route() {
     hideSit();
     const h = location.hash.replace('#', '');
+    setTimeout(micUI, 0);
     if (h === 'perso') return vPerso();
     if (h === 'fiches') return vFiches();
     if (!L() || h === 'setup') return vSetup();
@@ -151,6 +308,7 @@
         <div class="switch"><label for="hide" style="font-weight:700">Masquer les erreurs non travaillées</label><input type="checkbox" id="hide" ${S.hide ? 'checked' : ''}></div>
         <div class="switch"><label for="sit" style="font-weight:700">Proposer une précision après une erreur</label><input type="checkbox" id="sit" ${S.sit ? 'checked' : ''}></div>
         <div class="switch"><label for="sitd" style="font-weight:700">Temps pour choisir la précision</label><select id="sitd" class="input" style="width:auto;min-height:44px">${[[15, '15 s'], [30, '30 s'], [60, '1 min'], [0, 'Jusqu\'à fermeture']].map(([v, t]) => `<option value="${v}" ${(S.sitDur ?? 30) === v ? 'selected' : ''}>${t}</option>`).join('')}</select></div>
+        <div class="switch"><label for="voice" style="font-weight:700">Dictée vocale (essai)<span class="small muted" style="display:block;font-weight:400">${SR ? 'Micro en bas à droite, appui maintenu. La reconnaissance de Chrome peut passer par les serveurs de Google.' : 'Non disponible sur ce navigateur : utilise Chrome.'}</span></label><input type="checkbox" id="voice" ${S.voice ? 'checked' : ''} ${SR ? '' : 'disabled'}></div>
         <a class="pill" href="#perso" style="justify-content:space-between;margin-top:6px">Mes erreurs personnalisées (${S.custom.length}) <span aria-hidden="true">›</span></a>
         <a class="pill" href="#fiches" style="justify-content:space-between;margin-top:6px">▶ Fiches explicatives (${Object.keys(FICHES).length}) <span aria-hidden="true">›</span></a>
       </div>
@@ -180,6 +338,7 @@
     $app.querySelector('#hide').addEventListener('change', (e) => { S.hide = e.target.checked; save(); });
     $app.querySelector('#sit').addEventListener('change', (e) => { S.sit = e.target.checked; save(); });
     $app.querySelector('#sitd').addEventListener('change', (e) => { S.sitDur = parseInt(e.target.value, 10); save(); });
+    $app.querySelector('#voice').addEventListener('change', (e) => { S.voice = e.target.checked; save(); toast(S.voice ? 'Dictée activée : micro pendant la leçon' : 'Dictée désactivée'); });
     $app.querySelector('#go').addEventListener('click', () => {
       sync();
       if (cur && cur.log.length && !confirm('Remettre tous les compteurs à zéro ?')) return;
@@ -386,6 +545,7 @@
     if (b.later.length) out.push('', 'Repéré, pas encore travaillé : ' + b.later.map((r) => lc(r.txt)).join(', '));
     const pos = positives(b);
     if (pos.length) out.push('', 'Points positifs : ' + pos.join(', '));
+    if ((l.notes || []).length) out.push('', 'Notes : ' + l.notes.join(' ; '));
     const pl = plText(l);
     if (pl) out.push('', 'Prochaine leçon : ' + pl);
     return out.join('\n').trim() || 'Rien de noté pour cette leçon.';
@@ -425,6 +585,7 @@
       ${b.eLines.length ? `<div class="card"><h2>Erreurs</h2>${lines(b.eLines)}</div>` : ''}
       ${b.elLines.length || b.iLines.length ? `<div class="card" style="border:2px solid var(--orange)"><h2 style="color:var(--orange-d)">Interventions et éliminatoires</h2>${lines(b.elLines.concat(b.iLines))}</div>` : ''}
       ${b.later.length ? `<div class="card" style="opacity:.85"><h2>Repéré, pas encore travaillé</h2>${lines(b.later)}</div>` : ''}
+      ${(l.notes || []).length ? `<div class="card"><h2>Notes dictées</h2><div class="small muted">Non reconnues : à reclasser ou à garder telles quelles. Elles sont copiées pour Suivi Drive.</div>${l.notes.map((n, i) => `<div class="res"><div class="h"><span>${esc(n)}</span><button class="icon-btn" data-dn="${i}" aria-label="Supprimer la note" style="width:36px;height:36px">✕</button></div></div>`).join('')}</div>` : ''}
       <div class="card stack" id="pl-box"><h2>Prochaine leçon</h2>
         <details ${l.pl.length ? 'open' : ''}><summary>Choisir des thèmes${l.pl.length ? ' (' + l.pl.length + ')' : ''}</summary>${plChips}</details>
         <label for="pln" class="small muted">Note libre</label><textarea id="pln" class="input" rows="2" style="padding:10px 14px;min-height:64px">${esc(l.plNote)}</textarea></div>
@@ -436,6 +597,7 @@
       </div>`);
     $app.querySelectorAll('[data-pl]').forEach((x) => x.addEventListener('click', () => { const id = x.dataset.pl; l.pl = l.pl.includes(id) ? l.pl.filter((y) => y !== id) : l.pl.concat(id); save(); vBilan(); }));
     $app.querySelector('#pln').addEventListener('input', (e) => { l.plNote = e.target.value; save(); });
+    $app.querySelectorAll('[data-dn]').forEach((x) => x.addEventListener('click', () => { l.notes.splice(+x.dataset.dn, 1); save(); vBilan(); }));
     $app.querySelector('#cpro').addEventListener('click', () => copy(textPro(), 'Bilan copié'));
     $app.querySelector('#celv').addEventListener('click', () => copy(textEleve(), 'Message élève copié'));
     $app.querySelector('#new').addEventListener('click', () => {
